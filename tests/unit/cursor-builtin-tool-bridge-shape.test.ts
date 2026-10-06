@@ -372,3 +372,111 @@ test("expanded allowlist aliases match directly: codebase_search, run_command, v
   };
   assert.equal(bridgeCursorBuiltinTool(writeEvent, defs([patchTool]))?.toolName, "apply_patch");
 });
+
+test("generic client tool names are not Cursor bridge targets", () => {
+  const shellTool = (name: string): OpenAITool => ({
+    type: "function",
+    function: {
+      name,
+      parameters: {
+        type: "object",
+        properties: { command: { type: "string" } },
+        required: ["command"],
+        additionalProperties: false,
+      },
+    },
+  });
+  const writeTool = (name: string): OpenAITool => ({
+    type: "function",
+    function: {
+      name,
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          content: { type: "string" },
+        },
+        required: ["path", "content"],
+        additionalProperties: false,
+      },
+    },
+  });
+  const fetchTool = (name: string): OpenAITool => ({
+    type: "function",
+    function: {
+      name,
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string" } },
+        required: ["url"],
+        additionalProperties: false,
+      },
+    },
+  });
+  const shellEvent: ExecServerEvent = {
+    kind: "exec_shell",
+    execMsgId: "m",
+    execId: "e",
+    command: "ls -la",
+    workingDir: "",
+    timeout: 0,
+    isBackground: false,
+    hardTimeout: 0,
+  };
+  const writeEvent: ExecServerEvent = {
+    kind: "exec_write",
+    execMsgId: "m",
+    execId: "e",
+    path: "/b.txt",
+    fileText: "data",
+    hasFileBytes: false,
+    encodingHint: "utf-8",
+  };
+  const fetchEvent: ExecServerEvent = {
+    kind: "exec_fetch",
+    execMsgId: "m",
+    execId: "e",
+    url: "https://example.com",
+  };
+
+  // These short names belong to other clients. A compatible schema must not
+  // pull an ordinary tool call into the Cursor bridge.
+  for (const name of ["exec", "run", "command"]) {
+    assert.equal(bridgeCursorBuiltinTool(shellEvent, defs([shellTool(name)])), null, name);
+  }
+  for (const name of ["update", "edit"]) {
+    assert.equal(bridgeCursorBuiltinTool(writeEvent, defs([writeTool(name)])), null, name);
+  }
+  assert.equal(bridgeCursorBuiltinTool(fetchEvent, defs([fetchTool("fetch")])), null, "fetch");
+
+  assert.equal(
+    bridgeCursorBuiltinTool(shellEvent, defs([shellTool("exec"), shellTool("run_in_container")]))
+      ?.toolName,
+    "run_in_container"
+  );
+
+  assert.equal(
+    bridgeCursorBuiltinTool(shellEvent, defs([shellTool("run_terminal_cmd")]))?.toolName,
+    "run_terminal_cmd"
+  );
+  assert.equal(
+    bridgeCursorBuiltinTool(shellEvent, defs([shellTool("run_command")]))?.toolName,
+    "run_command"
+  );
+  assert.equal(
+    bridgeCursorBuiltinTool(writeEvent, defs([writeTool("edit_file")]))?.toolName,
+    "edit_file"
+  );
+  assert.equal(
+    bridgeCursorBuiltinTool(writeEvent, defs([writeTool("str_replace")]))?.toolName,
+    "str_replace"
+  );
+  assert.equal(
+    bridgeCursorBuiltinTool(fetchEvent, defs([fetchTool("web_fetch")]))?.toolName,
+    "web_fetch"
+  );
+  assert.equal(
+    bridgeCursorBuiltinTool(fetchEvent, defs([fetchTool("webfetch")]))?.toolName,
+    "webfetch"
+  );
+});

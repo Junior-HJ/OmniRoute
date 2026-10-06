@@ -38,11 +38,8 @@ const DIRECT_SHELL_TOOL_NAMES = [
   "run_terminal_cmd",
   "runcommand",
   "run_command",
-  "exec",
-  "run",
   "execute",
   "terminal",
-  "command",
 ];
 const TODO_WRITE_TOOL_NAMES = [
   "todowrite",
@@ -83,8 +80,6 @@ const WRITE_TOOL_NAMES = [
   "edit_file",
   "apply_patch",
   "patch",
-  "update",
-  "edit",
   "str_replace",
   "create",
   "save_file",
@@ -92,13 +87,21 @@ const WRITE_TOOL_NAMES = [
 const FETCH_TOOL_NAMES = [
   "webfetch",
   "web_fetch",
-  "fetch",
   "http_get",
   "download",
   "browse",
   "web_search",
   "search_web",
 ];
+/** Other clients own these short names. Never select them as Cursor bridge targets. */
+const NON_CURSOR_GENERIC_TOOL_NAMES = new Set([
+  "exec",
+  "run",
+  "command",
+  "update",
+  "edit",
+  "fetch",
+]);
 const READ_TOOL_NAMES = [
   "read",
   "read_file",
@@ -825,6 +828,7 @@ function bridgeSingleShapeCandidate<T extends McpToolDefinition>(
 ): CursorBuiltinToolBridge | null {
   const matches: CursorBuiltinToolBridge[] = [];
   for (const tool of tools) {
+    if (NON_CURSOR_GENERIC_TOOL_NAMES.has(tool.name.toLowerCase())) continue;
     const bridged = tryBridge(tool);
     if (bridged) matches.push(bridged);
   }
