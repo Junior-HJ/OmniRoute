@@ -1,16 +1,22 @@
 import { CODEBUDDY_INTL_CONFIG } from "../constants/oauth";
-import { codebuddyCn } from "./codebuddy-cn";
+import {
+  requestDeviceCode,
+  pollToken,
+  mapTokens,
+  type CodeBuddyDeviceCodeConfig,
+} from "./codebuddyDeviceAuth";
 
 /**
- * CodeBuddy International (codebuddy.ai) — device-auth flow.
- * Re-binds the shared CodeBuddy device flow to the international configuration.
+ * CodeBuddy International (codebuddy.ai) — custom device-auth flow.
  */
 export const codebuddyIntl = {
   config: CODEBUDDY_INTL_CONFIG,
   flowType: "device_code" as const,
-  requestDeviceCode: (config = CODEBUDDY_INTL_CONFIG) => codebuddyCn.requestDeviceCode(config as any),
-  pollToken: (config = CODEBUDDY_INTL_CONFIG, deviceCode: string) => codebuddyCn.pollToken(config as any, deviceCode),
-  mapTokens: codebuddyCn.mapTokens,
+  requestDeviceCode: (config: CodeBuddyDeviceCodeConfig = CODEBUDDY_INTL_CONFIG) =>
+    requestDeviceCode(config),
+  pollToken: (config: CodeBuddyDeviceCodeConfig = CODEBUDDY_INTL_CONFIG, deviceCode: string) =>
+    pollToken(config, deviceCode),
+  mapTokens,
 };
 
 export default codebuddyIntl;

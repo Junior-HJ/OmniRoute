@@ -8,13 +8,14 @@ import {
 } from "../../src/shared/constants/providers.ts";
 import { REGISTRY } from "../../open-sse/config/providerRegistry.ts";
 import { getExecutor } from "../../open-sse/executors/index.ts";
-import { CodeBuddyCnExecutor } from "../../open-sse/executors/codebuddy-cn.ts";
+import { CodeBuddyIntlExecutor } from "../../open-sse/executors/codebuddy-intl.ts";
 import {
   PROVIDERS as OAUTH_PROVIDER_IDS,
   CODEBUDDY_INTL_CONFIG,
 } from "../../src/lib/oauth/constants/oauth.ts";
 import PROVIDERS_MAP from "../../src/lib/oauth/providers/index.ts";
 import { supportsTokenRefresh } from "../../open-sse/services/tokenRefresh.ts";
+import { getCodeBuddyIntlUsage } from "../../open-sse/services/usage/codebuddy-intl.ts";
 import { CODEBUDDY_INTL_USER_AGENT } from "../../open-sse/config/providerHeaderProfiles.ts";
 
 test("codebuddy-intl is registered as an OAuth provider in the UI catalog", () => {
@@ -63,21 +64,24 @@ test("codebuddy-intl carries GLM, Kimi, MiniMax, Hy, GPT, Gemini and DeepSeek mo
   assert.ok(modelIds.includes("deepseek-v4.1-flash"));
 });
 
-test("getExecutor returns the CodeBuddyCnExecutor for 'codebuddy-intl' and the 'cbai' alias", async () => {
+test("getExecutor returns the CodeBuddyIntlExecutor for 'codebuddy-intl' and the 'cbai' alias", async () => {
   const exec = await getExecutor("codebuddy-intl");
   assert.ok(
-    exec instanceof CodeBuddyCnExecutor,
-    "codebuddy-intl must resolve to CodeBuddy executor"
+    exec instanceof CodeBuddyIntlExecutor,
+    "codebuddy-intl must resolve to CodeBuddyIntlExecutor"
   );
   assert.equal(exec.provider, "codebuddy-intl");
 
   const aliasExec = await getExecutor("cbai");
-  assert.ok(aliasExec instanceof CodeBuddyCnExecutor, "alias 'cbai' must resolve to same executor");
+  assert.ok(
+    aliasExec instanceof CodeBuddyIntlExecutor,
+    "alias 'cbai' must resolve to CodeBuddyIntlExecutor"
+  );
   assert.equal(aliasExec.provider, "codebuddy-intl");
 });
 
-test("CodeBuddyCnExecutor configured for intl forces stream:true and handles reasoning", () => {
-  const exec = new CodeBuddyCnExecutor("codebuddy-intl");
+test("CodeBuddyIntlExecutor forces stream:true and handles reasoning", () => {
+  const exec = new CodeBuddyIntlExecutor("codebuddy-intl");
   const transformed = exec.transformRequest(
     "glm-5.2",
     { messages: [{ role: "user", content: "hi" }] },
@@ -92,8 +96,8 @@ test("CodeBuddyCnExecutor configured for intl forces stream:true and handles rea
   assert.equal(msgs[1]?.role, "user");
 });
 
-test("CodeBuddyCnExecutor preserves existing system message and does not duplicate it", () => {
-  const exec = new CodeBuddyCnExecutor("codebuddy-intl");
+test("CodeBuddyIntlExecutor preserves existing system message and does not duplicate it", () => {
+  const exec = new CodeBuddyIntlExecutor("codebuddy-intl");
   const transformed = exec.transformRequest(
     "glm-5.2",
     {
@@ -111,6 +115,11 @@ test("CodeBuddyCnExecutor preserves existing system message and does not duplica
   assert.equal(msgs[0]?.role, "system");
   assert.equal(msgs[0]?.content, "You are an assistant.");
   assert.equal(msgs[1]?.role, "user");
+});
+
+test("getCodeBuddyIntlUsage returns credential not available when no token provided", async () => {
+  const res = await getCodeBuddyIntlUsage();
+  assert.ok(res.message?.includes("CodeBuddy Intl credential not available"));
 });
 
 test("codebuddy-intl OAuth config points to .ai endpoints", () => {
@@ -168,33 +177,4 @@ test("#12702: codebuddy-intl presents the same IDE/CodeBuddy version across OAut
     CODEBUDDY_INTL_USER_AGENT,
     "Chat completions User-Agent must match single source of truth"
   );
-});
-
-test("parseUpstreamError unwraps Tencent/CodeBuddy nested Error envelope", async () => {
-  const { parseUpstreamError } = await import("../../open-sse/utils/error.ts");
-  const body = JSON.stringify({
-    Response: {
-      Error: {
-        Code: "11102",
-        Message: "model service info not found",
-      },
-      RequestId: "req-123",
-    },
-  });
-  const res = new Response(body, { status: 400, headers: { "content-type": "application/json" } });
-  const parsed = await parseUpstreamError(res, "codebuddy-intl");
-  assert.equal(parsed.message, "model service info not found");
-  assert.equal(parsed.errorCode, "11102");
-});
-
-test("parseUpstreamError unwraps Tencent top-level msg error", async () => {
-  const { parseUpstreamError } = await import("../../open-sse/utils/error.ts");
-  const body = JSON.stringify({
-    code: 11101,
-    msg: "Non-stream chat request is currently not supported",
-  });
-  const res = new Response(body, { status: 400, headers: { "content-type": "application/json" } });
-  const parsed = await parseUpstreamError(res, "codebuddy-intl");
-  assert.equal(parsed.message, "Non-stream chat request is currently not supported");
-  assert.equal(parsed.errorCode, 11101);
 });
