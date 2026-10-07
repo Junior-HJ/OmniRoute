@@ -1375,23 +1375,23 @@
         "Authorization": "Bearer <TOK>",
         "Content-Type": "application/json",
         "Openai-Beta": "responses_websockets=2026-02-06",
-        "User-Agent": "codex-cli/0.156.1 (<OS>; <ARCH>)",
-        "Version": "0.156.1"
+        "User-Agent": "codex-cli/0.159.2 (<OS>; <ARCH>)",
+        "Version": "0.159.2"
       },
       "nonStream": {
         "Authorization": "Bearer <TOK>",
         "Content-Type": "application/json",
         "Openai-Beta": "responses_websockets=2026-02-06",
-        "User-Agent": "codex-cli/0.156.1 (<OS>; <ARCH>)",
-        "Version": "0.156.1"
+        "User-Agent": "codex-cli/0.159.2 (<OS>; <ARCH>)",
+        "Version": "0.159.2"
       },
       "oauth": {
         "Accept": "text/event-stream",
         "Authorization": "Bearer <TOK>",
         "Content-Type": "application/json",
         "Openai-Beta": "responses_websockets=2026-02-06",
-        "User-Agent": "codex-cli/0.156.1 (<OS>; <ARCH>)",
-        "Version": "0.156.1"
+        "User-Agent": "codex-cli/0.159.2 (<OS>; <ARCH>)",
+        "Version": "0.159.2"
       }
     },
     "url": {
@@ -2531,9 +2531,9 @@
         "X-Initiator": "user",
         "copilot-harness-id": "copilot-sdk",
         "copilot-integration-id": "copilot-developer-cli",
-        "editor-version": "copilot/1.0.88",
+        "editor-version": "copilot/1.0.91",
         "openai-intent": "conversation-agent",
-        "user-agent": "copilot/1.0.88 (win32) term/unknown",
+        "user-agent": "copilot/1.0.91 (win32) term/unknown",
         "x-client-machine-id": "<UUID>",
         "x-github-api-version": "2026-08-01",
         "x-interaction-type": "conversation-user"
@@ -2545,9 +2545,9 @@
         "X-Initiator": "user",
         "copilot-harness-id": "copilot-sdk",
         "copilot-integration-id": "copilot-developer-cli",
-        "editor-version": "copilot/1.0.88",
+        "editor-version": "copilot/1.0.91",
         "openai-intent": "conversation-agent",
-        "user-agent": "copilot/1.0.88 (win32) term/unknown",
+        "user-agent": "copilot/1.0.91 (win32) term/unknown",
         "x-client-machine-id": "<UUID>",
         "x-github-api-version": "2026-08-01",
         "x-interaction-type": "conversation-user"
@@ -2559,9 +2559,9 @@
         "X-Initiator": "user",
         "copilot-harness-id": "copilot-sdk",
         "copilot-integration-id": "copilot-developer-cli",
-        "editor-version": "copilot/1.0.88",
+        "editor-version": "copilot/1.0.91",
         "openai-intent": "conversation-agent",
-        "user-agent": "copilot/1.0.88 (win32) term/unknown",
+        "user-agent": "copilot/1.0.91 (win32) term/unknown",
         "x-client-machine-id": "<UUID>",
         "x-github-api-version": "2026-08-01",
         "x-interaction-type": "conversation-user"
@@ -2605,9 +2605,9 @@
         "X-Initiator": "user",
         "copilot-harness-id": "copilot-sdk",
         "copilot-integration-id": "copilot-developer-cli",
-        "editor-version": "copilot/1.0.88",
+        "editor-version": "copilot/1.0.91",
         "openai-intent": "conversation-agent",
-        "user-agent": "copilot/1.0.88 (win32) term/unknown",
+        "user-agent": "copilot/1.0.91 (win32) term/unknown",
         "x-client-machine-id": "<UUID>",
         "x-github-api-version": "2026-08-01",
         "x-interaction-type": "conversation-user",
@@ -2620,9 +2620,9 @@
         "X-Initiator": "user",
         "copilot-harness-id": "copilot-sdk",
         "copilot-integration-id": "copilot-developer-cli",
-        "editor-version": "copilot/1.0.88",
+        "editor-version": "copilot/1.0.91",
         "openai-intent": "conversation-agent",
-        "user-agent": "copilot/1.0.88 (win32) term/unknown",
+        "user-agent": "copilot/1.0.91 (win32) term/unknown",
         "x-client-machine-id": "<UUID>",
         "x-github-api-version": "2026-08-01",
         "x-interaction-type": "conversation-user",
@@ -2635,9 +2635,9 @@
         "X-Initiator": "user",
         "copilot-harness-id": "copilot-sdk",
         "copilot-integration-id": "copilot-developer-cli",
-        "editor-version": "copilot/1.0.88",
+        "editor-version": "copilot/1.0.91",
         "openai-intent": "conversation-agent",
-        "user-agent": "copilot/1.0.88 (win32) term/unknown",
+        "user-agent": "copilot/1.0.91 (win32) term/unknown",
         "x-client-machine-id": "<UUID>",
         "x-github-api-version": "2026-08-01",
         "x-interaction-type": "conversation-user",
@@ -4826,16 +4826,19 @@
       "apiKey": {
         "Accept": "text/event-stream",
         "Authorization": "Bearer <TOK>",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Pplx-Integration": "omniroute"
       },
       "nonStream": {
         "Authorization": "Bearer <TOK>",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Pplx-Integration": "omniroute"
       },
       "oauth": {
         "Accept": "text/event-stream",
         "Authorization": "Bearer <TOK>",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Pplx-Integration": "omniroute"
       }
     },
     "url": {
@@ -4849,16 +4852,19 @@
       "apiKey": {
         "Accept": "text/event-stream",
         "Authorization": "Bearer <TOK>",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Pplx-Integration": "omniroute"
       },
       "nonStream": {
         "Authorization": "Bearer <TOK>",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Pplx-Integration": "omniroute"
       },
       "oauth": {
         "Accept": "text/event-stream",
         "Authorization": "Bearer <TOK>",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Pplx-Integration": "omniroute"
       }
     },
     "url": {
