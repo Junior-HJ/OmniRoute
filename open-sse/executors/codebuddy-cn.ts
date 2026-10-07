@@ -102,8 +102,8 @@ async function isSensitiveContentRejection(response: Response): Promise<boolean>
  * so flatten before matching and preserve the original shape on replacement.
  */
 export class CodeBuddyCnExecutor extends DefaultExecutor {
-  constructor() {
-    super("codebuddy-cn");
+  constructor(providerId: string = "codebuddy-cn") {
+    super(providerId);
   }
 
   async execute(input: ExecuteInput): Promise<ExecutorExecuteResult> {
@@ -115,8 +115,9 @@ export class CodeBuddyCnExecutor extends DefaultExecutor {
     const compactBody = compactToolDescriptions(input.body);
     if (!compactBody) return result;
 
+    const logTag = (this.provider || "codebuddy-cn").toUpperCase().replace(/-/g, "_");
     input.log?.debug?.(
-      "CODEBUDDY_CN",
+      logTag,
       "Upstream rejected an oversized tool request as sensitive content; retrying with compact tool descriptions"
     );
     return super.execute({

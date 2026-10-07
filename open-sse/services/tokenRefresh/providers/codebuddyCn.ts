@@ -9,24 +9,25 @@ import type { RefreshLogger } from "../shared.ts";
  * the refresh token carried in the X-Refresh-Token header (not a form body),
  * matching the official CodeBuddy CLI. Response: { code: 0, data: <token> }.
  */
-export async function refreshCodebuddyCnToken(
+export async function refreshCodebuddyToken(
+  oauthConfig: { refreshUrl: string; userAgent: string; domain?: string },
   refreshToken: string,
   log: RefreshLogger,
-  proxyConfig: unknown = null
+  proxyConfig: unknown = null,
+  realmLabel: string = "CodeBuddy"
 ) {
   if (!refreshToken) return null;
-  const { CODEBUDDY_CN_CONFIG } = await import("@/lib/oauth/constants/oauth");
-  const oauth = CODEBUDDY_CN_CONFIG;
+  const domain = oauthConfig.domain || "copilot.tencent.com";
   try {
     const response = await runWithProxyContext(proxyConfig, () =>
-      fetch(oauth.refreshUrl, {
+      fetch(oauthConfig.refreshUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          "User-Agent": oauth.userAgent,
+          "User-Agent": oauthConfig.userAgent,
           "X-Requested-With": "XMLHttpRequest",
-          "X-Domain": "copilot.tencent.com",
+          "X-Domain": domain,
           "X-Refresh-Token": refreshToken,
           "X-Auth-Refresh-Source": "plugin",
           "X-Product": "SaaS",
@@ -37,7 +38,7 @@ export async function refreshCodebuddyCnToken(
 
     if (!response.ok) {
       const errorText = await response.text();
-      log?.error?.("TOKEN_REFRESH", "Failed to refresh CodeBuddy CN token", {
+      log?.error?.("TOKEN_REFRESH", `Failed to refresh ${realmLabel} token`, {
         status: response.status,
         error: errorText,
       });
@@ -46,14 +47,14 @@ export async function refreshCodebuddyCnToken(
 
     const data = await response.json();
     if (data?.code !== 0 || !data?.data?.accessToken) {
-      log?.error?.("TOKEN_REFRESH", "CodeBuddy CN token refresh returned no token", {
+      log?.error?.("TOKEN_REFRESH", `${realmLabel} token refresh returned no token`, {
         code: data?.code,
         msg: data?.msg,
       });
       return null;
     }
 
-    log?.info?.("TOKEN_REFRESH", "Successfully refreshed CodeBuddy CN token", {
+    log?.info?.("TOKEN_REFRESH", `Successfully refreshed ${realmLabel} token`, {
       hasNewAccessToken: !!data.data.accessToken,
       hasNewRefreshToken: !!data.data.refreshToken,
       expiresIn: data.data.expiresIn,
@@ -65,7 +66,25 @@ export async function refreshCodebuddyCnToken(
       expiresIn: data.data.expiresIn,
     };
   } catch (error) {
-    log?.error?.("TOKEN_REFRESH", `Network error refreshing CodeBuddy CN token: ${error?.message}`);
+    log?.error?.("TOKEN_REFRESH", `Network error refreshing ${realmLabel} token: ${error?.message}`);
     return null;
   }
+}
+
+export async function refreshCodebuddyCnToken(
+  refreshToken: string,
+  log: RefreshLogger,
+  proxyConfig: unknown = null
+) {
+  const { CODEBUDDY_CN_CONFIG } = await import("@/lib/oauth/constants/oauth");
+  return refreshCodebuddyToken(CODEBUDDY_CN_CONFIG, refreshToken, log, proxyConfig, "CodeBuddy CN");
+}
+
+export async function refreshCodebuddyIntlToken(
+  refreshToken: string,
+  log: RefreshLogger,
+  proxyConfig: unknown = null
+) {
+  const { CODEBUDDY_INTL_CONFIG } = await import("@/lib/oauth/constants/oauth");
+  return refreshCodebuddyToken(CODEBUDDY_INTL_CONFIG, refreshToken, log, proxyConfig, "CodeBuddy Intl");
 }

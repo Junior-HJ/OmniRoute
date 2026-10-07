@@ -281,6 +281,10 @@ export const OAUTH_TEST_CONFIG: Record<string, OAuthTestConfigEntry> = {
     checkExpiry: true,
     refreshable: true,
   },
+  "codebuddy-intl": {
+    checkExpiry: true,
+    refreshable: true,
+  },
   "devin-cli": {
     // Same gap as grok-cli #7610: absent from this table, so "Test Connection"
     // always fell through to "Provider test not supported" and left a working

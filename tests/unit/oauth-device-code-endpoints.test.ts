@@ -23,3 +23,12 @@ test("codebuddy-cn device-code sends platform as a query param (not body-only)",
     "platform query param"
   );
 });
+
+test("codebuddy-intl device-code re-uses the shared query-param platform flow", () => {
+  const intl = read("src/lib/oauth/providers/codebuddy-intl.ts");
+  assert.match(
+    intl,
+    /codebuddyCn\.requestDeviceCode/,
+    "re-uses shared requestDeviceCode implementation"
+  );
+});

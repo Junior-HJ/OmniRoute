@@ -166,6 +166,10 @@ const lazyExecutors: Record<string, () => Promise<BaseExecutor>> = {
   gc: () => import("./grok-cli.ts").then((m) => new m.GrokCliExecutor()), // Alias
   "codebuddy-cn": () => import("./codebuddy-cn.ts").then((m) => new m.CodeBuddyCnExecutor()),
   cbcn: () => import("./codebuddy-cn.ts").then((m) => new m.CodeBuddyCnExecutor()), // Alias for codebuddy-cn
+  "codebuddy-intl": () =>
+    import("./codebuddy-cn.ts").then((m) => new m.CodeBuddyCnExecutor("codebuddy-intl")),
+  cbai: () =>
+    import("./codebuddy-cn.ts").then((m) => new m.CodeBuddyCnExecutor("codebuddy-intl")), // Alias for codebuddy-intl
   "zenmux-free": () => import("./zenmux-free.ts").then((m) => new m.ZenmuxFreeExecutor()),
   "cloudflare-playground": () =>
     import("./cloudflare-playground.ts").then((m) => new m.CloudflarePlaygroundExecutor()),

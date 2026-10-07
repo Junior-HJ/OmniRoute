@@ -14,9 +14,13 @@
  * packs, "Bonus Pack N" for bonus packs (soonest-expiring first).
  */
 
-import { CODEBUDDY_CN_USER_AGENT } from "../../config/providerHeaderProfiles.ts";
+import {
+  CODEBUDDY_CN_USER_AGENT,
+  CODEBUDDY_INTL_USER_AGENT,
+} from "../../config/providerHeaderProfiles.ts";
 
-const USAGE_URL = "https://copilot.tencent.com/v2/billing/meter/get-user-resource";
+const CN_USAGE_URL = "https://copilot.tencent.com/v2/billing/meter/get-user-resource";
+const INTL_USAGE_URL = "https://www.codebuddy.ai/v2/billing/meter/get-user-resource";
 
 interface TencentAccount {
   PackageName?: string;
@@ -115,27 +119,33 @@ interface CodeBuddyUsageResult {
   message?: string;
 }
 
-export async function getCodeBuddyCnUsage(
-  accessToken?: string,
-  apiKey?: string,
-  _providerSpecificData?: unknown
+export async function fetchCodeBuddyQuota(
+  accessToken: string | undefined,
+  apiKey: string | undefined,
+  realm: "cn" | "intl" = "cn"
 ): Promise<CodeBuddyUsageResult> {
   const token = accessToken || apiKey;
+  const isIntl = realm === "intl";
+  const realmLabel = isIntl ? "CodeBuddy Intl" : "CodeBuddy CN";
   if (!token) {
-    return { message: "CodeBuddy CN credential not available." };
+    return { message: `${realmLabel} credential not available.` };
   }
 
+  const url = isIntl ? INTL_USAGE_URL : CN_USAGE_URL;
+  const userAgent = isIntl ? CODEBUDDY_INTL_USER_AGENT : CODEBUDDY_CN_USER_AGENT;
+  const ideType = isIntl ? "IDE" : "CLI";
+
   try {
-    const response = await fetch(USAGE_URL, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": CODEBUDDY_CN_USER_AGENT,
+        "User-Agent": userAgent,
         "X-Product": "SaaS",
-        "X-IDE-Type": "CLI",
-        "X-IDE-Name": "CLI",
+        "X-IDE-Type": ideType,
+        "X-IDE-Name": ideType,
         "x-requested-with": "XMLHttpRequest",
         "x-codebuddy-request": "1",
       },
@@ -143,21 +153,21 @@ export async function getCodeBuddyCnUsage(
     });
 
     if (response.status === 401 || response.status === 403) {
-      return { message: "CodeBuddy CN credential invalid or expired." };
+      return { message: `${realmLabel} credential invalid or expired.` };
     }
     if (!response.ok) {
-      return { message: `CodeBuddy CN quota API error (${response.status}).` };
+      return { message: `${realmLabel} quota API error (${response.status}).` };
     }
 
     const json: any = await response.json();
     if (json?.code !== 0) {
-      return { message: `CodeBuddy CN quota error: ${json?.msg || "unknown"}` };
+      return { message: `${realmLabel} quota error: ${json?.msg || "unknown"}` };
     }
 
     const data = json?.data?.Response?.Data || {};
     const accountsRaw: TencentAccount[] = Array.isArray(data.Accounts) ? data.Accounts : [];
     if (accountsRaw.length === 0) {
-      return { message: "CodeBuddy CN connected. No credit package found." };
+      return { message: `${realmLabel} connected. No credit package found.` };
     }
 
     const byExpiry = (a: TencentAccount, b: TencentAccount) => cycleEndMs(a) - cycleEndMs(b);
@@ -187,15 +197,31 @@ export async function getCodeBuddyCnUsage(
     });
 
     const basePkg = refills[0] || accountsRaw[0] || {};
-    const plan = basePkg.PackageName || basePkg.SubProductName || "CodeBuddy CN";
+    const plan = basePkg.PackageName || basePkg.SubProductName || realmLabel;
 
     return { plan, quotas };
   } catch (error: any) {
     // Hard Rule #12: no raw err.message in any HTTP/SSE/executor response. Usage
     // handler returns a controlled string for the dashboard; do not include the
     // raw exception text in case it carries a path/stack snippet.
-    return { message: "CodeBuddy CN error: failed to fetch quota." };
+    return { message: `${realmLabel} error: failed to fetch quota.` };
   }
+}
+
+export async function getCodeBuddyCnUsage(
+  accessToken?: string,
+  apiKey?: string,
+  _providerSpecificData?: unknown
+): Promise<CodeBuddyUsageResult> {
+  return fetchCodeBuddyQuota(accessToken, apiKey, "cn");
+}
+
+export async function getCodeBuddyIntlUsage(
+  accessToken?: string,
+  apiKey?: string,
+  _providerSpecificData?: unknown
+): Promise<CodeBuddyUsageResult> {
+  return fetchCodeBuddyQuota(accessToken, apiKey, "intl");
 }
 
 export default getCodeBuddyCnUsage;

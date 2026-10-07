@@ -1,37 +1,33 @@
-import { CODEBUDDY_CN_USER_AGENT } from "../../../providerHeaderProfiles.ts";
+import { CODEBUDDY_INTL_USER_AGENT } from "../../../providerHeaderProfiles.ts";
 import type { RegistryEntry } from "../../shared.ts";
 
 /**
- * CodeBuddy CN (Tencent) — copilot.tencent.com.
+ * CodeBuddy International (codebuddy.ai).
  *
- * Unified OpenAI-compatible gateway behind Tencent's CodeBuddy CLI. Carries 15
- * models (GLM, Kimi, MiniMax, DeepSeek, Hunyuan) and reasons via OpenAI-style
- * `reasoning_effort` (not vendor-native thinking shapes). Streaming is forced
- * by the executor because non-stream requests are rejected with code 11101.
+ * Unified OpenAI-compatible gateway behind the CodeBuddy International service.
+ * Carries 15 models (GLM, Kimi, MiniMax, DeepSeek, Hunyuan) and reasons via
+ * OpenAI-style `reasoning_effort` (not vendor-native thinking shapes). Streaming
+ * is forced by the executor because non-stream requests are rejected with code 11101.
  *
- * Short alias "cbcn" (paired with "cbai" for the CodeBuddy intl variant).
- * Per-model context windows/vision are advertised in the catalog below.
+ * Short alias "cbai" matches the reserved alias convention.
  */
-export const codebuddy_cnProvider: RegistryEntry = {
-  id: "codebuddy-cn",
-  alias: "cbcn",
+export const codebuddy_intlProvider: RegistryEntry = {
+  id: "codebuddy-intl",
+  alias: "cbai",
   format: "openai",
-  executor: "codebuddy-cn",
-  baseUrl: "https://copilot.tencent.com/v2/chat/completions",
+  executor: "codebuddy-intl",
+  baseUrl: "https://www.codebuddy.ai/v2/chat/completions",
   authType: "oauth",
   authHeader: "bearer",
   headers: {
-    "User-Agent": CODEBUDDY_CN_USER_AGENT,
+    "User-Agent": CODEBUDDY_INTL_USER_AGENT,
     "X-Product": "SaaS",
-    "X-IDE-Type": "CLI",
-    "X-IDE-Name": "CLI",
+    "X-IDE-Type": "IDE",
+    "X-IDE-Name": "IDE",
     "x-requested-with": "XMLHttpRequest",
     "x-codebuddy-request": "1",
   },
   models: [
-    // contextLength is the OmniRoute analogue of upstream's contextWindow;
-    // supportsReasoning + supportsVision drive UI affordances and translator
-    // decisions. Sourced from the gateway's model config.
     {
       id: "glm-5.2",
       name: "GLM-5.2",
@@ -67,6 +63,13 @@ export const codebuddy_cnProvider: RegistryEntry = {
       maxOutputTokens: 38000,
       supportsReasoning: true,
       supportsVision: true,
+    },
+    {
+      id: "glm-4.7",
+      name: "GLM-4.7",
+      contextLength: 200000,
+      maxOutputTokens: 48000,
+      supportsReasoning: true,
     },
     {
       id: "minimax-m3",
@@ -117,14 +120,6 @@ export const codebuddy_cnProvider: RegistryEntry = {
       supportsVision: true,
     },
     {
-      id: "hy3",
-      name: "Hy3",
-      contextLength: 192000,
-      maxOutputTokens: 64000,
-      supportsReasoning: true,
-      supportsVision: true,
-    },
-    {
       id: "deepseek-v4-pro",
       name: "DeepSeek-V4-Pro",
       contextLength: 1000000,
@@ -133,8 +128,8 @@ export const codebuddy_cnProvider: RegistryEntry = {
       supportsVision: true,
     },
     {
-      id: "deepseek-v4-flash",
-      name: "DeepSeek-V4-Flash",
+      id: "deepseek-v4.1-flash",
+      name: "DeepSeek-V4.1-Flash",
       contextLength: 1000000,
       maxOutputTokens: 50000,
       supportsReasoning: true,
@@ -150,4 +145,4 @@ export const codebuddy_cnProvider: RegistryEntry = {
   ],
 };
 
-export default codebuddy_cnProvider;
+export default codebuddy_intlProvider;

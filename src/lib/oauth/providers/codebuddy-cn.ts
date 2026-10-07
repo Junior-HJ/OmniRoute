@@ -41,6 +41,7 @@ export const codebuddyCn = {
     // CodeBuddy reads `platform` from the QUERY string, not the JSON body — sending it only in the
     // body returns 400 "platform is empty" (verified). Pass it as a query param; body kept as-is.
     const stateUrl = `${config.stateUrl}?platform=${encodeURIComponent(config.platform)}`;
+    const domain = (config as { domain?: string }).domain || "copilot.tencent.com";
     const response = await fetch(stateUrl, {
       method: "POST",
       headers: {
@@ -48,7 +49,7 @@ export const codebuddyCn = {
         Accept: "application/json",
         "User-Agent": config.userAgent,
         "X-Requested-With": "XMLHttpRequest",
-        "X-Domain": "copilot.tencent.com",
+        "X-Domain": domain,
         "X-No-Authorization": "true",
         "X-No-User-Id": "true",
         "X-Product": "SaaS",
@@ -81,6 +82,7 @@ export const codebuddyCn = {
   pollToken: async (config: CodeBuddyConfig, deviceCode: string): Promise<CodeBuddyPollResult> => {
     // GET with state as a query param (not POST/body) — matches the official CLI's
     // /v2/plugin/auth/token?state=... endpoint shape.
+    const domain = (config as { domain?: string }).domain || "copilot.tencent.com";
     const response = await fetch(
       `${config.tokenUrl}?state=${encodeURIComponent(deviceCode)}`,
       {
@@ -89,7 +91,7 @@ export const codebuddyCn = {
           Accept: "application/json",
           "User-Agent": config.userAgent,
           "X-Requested-With": "XMLHttpRequest",
-          "X-Domain": "copilot.tencent.com",
+          "X-Domain": domain,
           "X-No-Authorization": "true",
           "X-No-User-Id": "true",
           "X-No-Enterprise-Id": "true",

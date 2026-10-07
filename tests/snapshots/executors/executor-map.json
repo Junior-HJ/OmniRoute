@@ -70,6 +70,11 @@
       "configSource": "<custom-config>",
       "provider": "blackbox-web"
     },
+    "cbai": {
+      "className": "CodeBuddyCnExecutor",
+      "configSource": "codebuddy-intl",
+      "provider": "codebuddy-intl"
+    },
     "cbcn": {
       "className": "CodeBuddyCnExecutor",
       "configSource": "codebuddy-cn",
@@ -149,6 +154,11 @@
       "className": "CodeBuddyCnExecutor",
       "configSource": "codebuddy-cn",
       "provider": "codebuddy-cn"
+    },
+    "codebuddy-intl": {
+      "className": "CodeBuddyCnExecutor",
+      "configSource": "codebuddy-intl",
+      "provider": "codebuddy-intl"
     },
     "codex": {
       "className": "CodexExecutor",

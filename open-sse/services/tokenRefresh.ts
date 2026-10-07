@@ -39,7 +39,7 @@ import {
   getCircuitBreakerStatus,
   refreshWithRetry,
 } from "./tokenRefresh/circuitBreaker.ts";
-import { refreshCodebuddyCnToken } from "./tokenRefresh/providers/codebuddyCn.ts";
+import { refreshCodebuddyCnToken, refreshCodebuddyIntlToken } from "./tokenRefresh/providers/codebuddyCn.ts";
 import { refreshClineToken } from "./tokenRefresh/providers/cline.ts";
 import { refreshKimiCodingToken } from "./tokenRefresh/providers/kimiCoding.ts";
 import { refreshMuseCodeToken } from "./tokenRefresh/providers/museCode.ts";
@@ -471,6 +471,9 @@ async function _getAccessTokenInternal(provider, credentials, log, proxyConfig: 
     case "codebuddy-cn":
       return await refreshCodebuddyCnToken(credentials.refreshToken, log, proxyConfig);
 
+    case "codebuddy-intl":
+      return await refreshCodebuddyIntlToken(credentials.refreshToken, log, proxyConfig);
+
     default:
       // Fallback to generic OAuth refresh for unknown providers
       return refreshAccessToken(provider, credentials.refreshToken, credentials, log, proxyConfig);
@@ -502,6 +505,7 @@ export function supportsTokenRefresh(provider) {
     // testStatus="expired" / errorCode="no_refresh_token".
     "gitlab-duo",
     "codebuddy-cn",
+    "codebuddy-intl",
     "cursor",
   ]);
   if (explicitlySupported.has(provider)) return true;
