@@ -87,6 +87,30 @@ test("CodeBuddyCnExecutor configured for intl forces stream:true and handles rea
 
   assert.equal(transformed.stream, true, "stream must be forced true");
   assert.equal(transformed.reasoning_summary, undefined);
+  const msgs = transformed.messages as Array<Record<string, unknown>>;
+  assert.equal(msgs[0]?.role, "system", "must prepend system message when first is user");
+  assert.equal(msgs[1]?.role, "user");
+});
+
+test("CodeBuddyCnExecutor preserves existing system message and does not duplicate it", () => {
+  const exec = new CodeBuddyCnExecutor("codebuddy-intl");
+  const transformed = exec.transformRequest(
+    "glm-5.2",
+    {
+      messages: [
+        { role: "system", content: "You are an assistant." },
+        { role: "user", content: "hi" },
+      ],
+    },
+    false,
+    { apiKey: "test" }
+  ) as Record<string, unknown>;
+
+  const msgs = transformed.messages as Array<Record<string, unknown>>;
+  assert.equal(msgs.length, 2);
+  assert.equal(msgs[0]?.role, "system");
+  assert.equal(msgs[0]?.content, "You are an assistant.");
+  assert.equal(msgs[1]?.role, "user");
 });
 
 test("codebuddy-intl OAuth config points to .ai endpoints", () => {
