@@ -859,12 +859,19 @@ export async function parseUpstreamError(response: Response, provider: string | 
         ? clinepassEnvError.message
         : json.error?.message ||
           json.message ||
+          json.msg ||
+          json.data?.Response?.Error?.Message ||
+          json.Response?.Error?.Message ||
           (typeof json.error === "string" ? json.error : null);
       message =
         typeof extractedMessage === "string"
           ? extractedMessage
           : `Upstream error: ${response.status}`;
-      errorCode = json.error?.code || json.code;
+      errorCode =
+        json.error?.code ||
+        json.code ||
+        json.data?.Response?.Error?.Code ||
+        json.Response?.Error?.Code;
       errorType = json.error?.type || json.type;
     } catch {
       message = text;

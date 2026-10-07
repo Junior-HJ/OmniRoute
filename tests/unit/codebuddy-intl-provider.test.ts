@@ -44,25 +44,31 @@ test("codebuddy-intl registry entry has expected shape", () => {
   assert.equal(r.headers?.["X-IDE-Name"], "IDE");
   assert.equal(r.headers?.["x-codebuddy-request"], "1");
   assert.ok(Array.isArray(r.models), "models array expected");
-  assert.equal(r.models.length, 15, "port of 9router intl lineup: 15 models");
+  assert.equal(r.models.length, 22, "probed intl lineup: 22 models");
 });
 
-test("codebuddy-intl carries GLM, Kimi, MiniMax, Hy3 and DeepSeek models", () => {
+test("codebuddy-intl carries GLM, Kimi, MiniMax, Hy, GPT, Gemini and DeepSeek models", () => {
   const r = REGISTRY["codebuddy-intl"];
   const modelIds = (r.models || []).map((m) => m.id);
   assert.ok(modelIds.includes("glm-5.2"));
-  assert.ok(modelIds.includes("glm-4.7"));
+  assert.ok(modelIds.includes("glm-5.3"));
+  assert.ok(modelIds.includes("glm-5.3-flash"));
+  assert.ok(modelIds.includes("kimi-k3"));
   assert.ok(modelIds.includes("kimi-k2.7"));
   assert.ok(modelIds.includes("minimax-m3"));
-  assert.ok(modelIds.includes("hy3-preview"));
-  assert.ok(modelIds.includes("deepseek-v4-pro"));
+  assert.ok(modelIds.includes("hy3"));
+  assert.ok(modelIds.includes("hy4-preview"));
+  assert.ok(modelIds.includes("gpt-6-astra"));
+  assert.ok(modelIds.includes("gemini-3.5-flash"));
   assert.ok(modelIds.includes("deepseek-v4.1-flash"));
-  assert.ok(modelIds.includes("deepseek-v3-2-volc"));
 });
 
 test("getExecutor returns the CodeBuddyCnExecutor for 'codebuddy-intl' and the 'cbai' alias", async () => {
   const exec = await getExecutor("codebuddy-intl");
-  assert.ok(exec instanceof CodeBuddyCnExecutor, "codebuddy-intl must resolve to CodeBuddy executor");
+  assert.ok(
+    exec instanceof CodeBuddyCnExecutor,
+    "codebuddy-intl must resolve to CodeBuddy executor"
+  );
   assert.equal(exec.provider, "codebuddy-intl");
 
   const aliasExec = await getExecutor("cbai");
@@ -87,8 +93,12 @@ test("codebuddy-intl OAuth config points to .ai endpoints", () => {
   assert.equal(CODEBUDDY_INTL_CONFIG.baseUrl, "https://www.codebuddy.ai");
   assert.equal(CODEBUDDY_INTL_CONFIG.stateUrl, "https://www.codebuddy.ai/v2/plugin/auth/state");
   assert.equal(CODEBUDDY_INTL_CONFIG.tokenUrl, "https://www.codebuddy.ai/v2/plugin/auth/token");
-  assert.equal(CODEBUDDY_INTL_CONFIG.refreshUrl, "https://www.codebuddy.ai/v2/plugin/auth/token/refresh");
+  assert.equal(
+    CODEBUDDY_INTL_CONFIG.refreshUrl,
+    "https://www.codebuddy.ai/v2/plugin/auth/token/refresh"
+  );
   assert.equal(CODEBUDDY_INTL_CONFIG.domain, "www.codebuddy.ai");
+  assert.equal(CODEBUDDY_INTL_CONFIG.platform, "ide");
   assert.equal(CODEBUDDY_INTL_CONFIG.userAgent, CODEBUDDY_INTL_USER_AGENT);
   assert.equal(OAUTH_PROVIDER_IDS.CODEBUDDY_INTL, "codebuddy-intl");
 });
@@ -103,7 +113,10 @@ test("codebuddy-intl OAuth provider is wired in PROVIDERS_MAP", () => {
 });
 
 test("codebuddy-intl token refresh is supported", () => {
-  assert.ok(supportsTokenRefresh("codebuddy-intl"), "codebuddy-intl must be supported in tokenRefresh");
+  assert.ok(
+    supportsTokenRefresh("codebuddy-intl"),
+    "codebuddy-intl must be supported in tokenRefresh"
+  );
 });
 
 test("codebuddy-intl is in USAGE_SUPPORTED_PROVIDERS", () => {
@@ -114,7 +127,10 @@ test("codebuddy-intl is in USAGE_SUPPORTED_PROVIDERS", () => {
 });
 
 test("codebuddy-intl is treated as a managed dual-auth provider", () => {
-  assert.ok(supportsDualAuthProvider("codebuddy-intl"), "codebuddy-intl must be in DUAL_AUTH_PROVIDER_IDS");
+  assert.ok(
+    supportsDualAuthProvider("codebuddy-intl"),
+    "codebuddy-intl must be in DUAL_AUTH_PROVIDER_IDS"
+  );
 });
 
 test("#12702: codebuddy-intl presents the same IDE/CodeBuddy version across OAuth and chat", () => {
@@ -128,4 +144,33 @@ test("#12702: codebuddy-intl presents the same IDE/CodeBuddy version across OAut
     CODEBUDDY_INTL_USER_AGENT,
     "Chat completions User-Agent must match single source of truth"
   );
+});
+
+test("parseUpstreamError unwraps Tencent/CodeBuddy nested Error envelope", async () => {
+  const { parseUpstreamError } = await import("../../open-sse/utils/error.ts");
+  const body = JSON.stringify({
+    Response: {
+      Error: {
+        Code: "11102",
+        Message: "model service info not found",
+      },
+      RequestId: "req-123",
+    },
+  });
+  const res = new Response(body, { status: 400, headers: { "content-type": "application/json" } });
+  const parsed = await parseUpstreamError(res, "codebuddy-intl");
+  assert.equal(parsed.message, "model service info not found");
+  assert.equal(parsed.errorCode, "11102");
+});
+
+test("parseUpstreamError unwraps Tencent top-level msg error", async () => {
+  const { parseUpstreamError } = await import("../../open-sse/utils/error.ts");
+  const body = JSON.stringify({
+    code: 11101,
+    msg: "Non-stream chat request is currently not supported",
+  });
+  const res = new Response(body, { status: 400, headers: { "content-type": "application/json" } });
+  const parsed = await parseUpstreamError(res, "codebuddy-intl");
+  assert.equal(parsed.message, "Non-stream chat request is currently not supported");
+  assert.equal(parsed.errorCode, 11101);
 });

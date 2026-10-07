@@ -128,7 +128,7 @@ export const CODEBUDDY_INTL_CONFIG = {
   tokenUrl: "https://www.codebuddy.ai/v2/plugin/auth/token",
   refreshUrl: "https://www.codebuddy.ai/v2/plugin/auth/token/refresh",
   userAgent: CODEBUDDY_INTL_USER_AGENT,
-  platform: "CLI",
+  platform: "ide",
   domain: "www.codebuddy.ai",
   pollInterval: 5000,
 };
