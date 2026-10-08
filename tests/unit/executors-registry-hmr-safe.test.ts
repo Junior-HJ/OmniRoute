@@ -36,3 +36,23 @@ test("registerLazyExecutor is HMR-safe and re-registration overwrites cached ins
   const v2 = (await loadRegisteredExecutor(alias)) as DummyExecutor;
   assert.equal(v2.version, 2, "subsequent load resolves updated executor version");
 });
+
+test("an in-flight load cannot republish the stale executor after HMR", async () => {
+  const alias = `test-hmr-inflight-${Date.now()}`;
+  let release: (executor: DummyExecutor) => void = () => {};
+  const gate = new Promise<DummyExecutor>((resolve) => {
+    release = resolve;
+  });
+
+  registerLazyExecutor(alias, () => gate);
+  const first = loadRegisteredExecutor(alias);
+  assert.ok(first, "first load starts");
+
+  registerLazyExecutor(alias, async () => new DummyExecutor(2));
+  release(new DummyExecutor(1));
+  const stale = (await first) as DummyExecutor;
+  assert.equal(stale.version, 1, "the caller that started v1 still receives v1");
+
+  const current = (await loadRegisteredExecutor(alias)) as DummyExecutor;
+  assert.equal(current.version, 2, "a load started after HMR resolves the replacement");
+});
