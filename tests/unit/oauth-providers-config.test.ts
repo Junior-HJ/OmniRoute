@@ -29,6 +29,7 @@ const {
   CODEX_CONFIG,
   CODEBUDDY_CN_CONFIG,
   CODEBUDDY_INTL_CONFIG,
+  WORKBUDDY_CONFIG,
   DEVIN_DESKTOP_CONFIG,
   ZED_CONFIG,
   CURSOR_CONFIG,
@@ -76,6 +77,7 @@ const EXPECTED_PROVIDER_KEYS = [
   "openference",
   "codebuddy-cn",
   "codebuddy-intl",
+  "workbuddy",
   "zed",
   "zed-hosted",
   "muse-code",
@@ -112,6 +114,7 @@ const EXPECTED_CONFIG_BY_PROVIDER = {
   openference: OPENFERENCE_CONFIG,
   "codebuddy-cn": CODEBUDDY_CN_CONFIG,
   "codebuddy-intl": CODEBUDDY_INTL_CONFIG,
+  workbuddy: WORKBUDDY_CONFIG,
   zed: ZED_CONFIG,
   "zed-hosted": ZED_HOSTED_CONFIG,
   "muse-code": MUSE_CODE_CONFIG,
@@ -454,7 +457,15 @@ test("Google OAuth callbacks stay on localhost when no custom credentials are co
 });
 
 test("device and import-token providers expose the flow-specific fields expected by their configs", () => {
-  const deviceProviders = ["kimi-coding", "github", "kiro", "amazon-q", "kilocode", "muse-code"];
+  const deviceProviders = [
+    "kimi-coding",
+    "github",
+    "kiro",
+    "amazon-q",
+    "kilocode",
+    "workbuddy",
+    "muse-code",
+  ];
 
   for (const providerId of deviceProviders) {
     const provider = PROVIDERS[providerId];

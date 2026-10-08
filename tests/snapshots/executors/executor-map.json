@@ -70,11 +70,6 @@
       "configSource": "<custom-config>",
       "provider": "blackbox-web"
     },
-    "cbai": {
-      "className": "CodeBuddyIntlExecutor",
-      "configSource": "codebuddy-intl",
-      "provider": "codebuddy-intl"
-    },
     "cbcn": {
       "className": "CodeBuddyCnExecutor",
       "configSource": "codebuddy-cn",
@@ -104,6 +99,11 @@
       "className": "ChatGptWebCodexExecutor",
       "configSource": "<custom-config>",
       "provider": "chatgpt-web-codex"
+    },
+    "chatplayground": {
+      "className": "ChatPlaygroundExecutor",
+      "configSource": "<custom-config>",
+      "provider": "chatplayground"
     },
     "cheaperinference": {
       "className": "CheaperInferenceExecutor",
@@ -155,11 +155,6 @@
       "configSource": "codebuddy-cn",
       "provider": "codebuddy-cn"
     },
-    "codebuddy-intl": {
-      "className": "CodeBuddyIntlExecutor",
-      "configSource": "codebuddy-intl",
-      "provider": "codebuddy-intl"
-    },
     "codex": {
       "className": "CodexExecutor",
       "configSource": "codex",
@@ -199,6 +194,11 @@
       "className": "CliproxyapiExecutor",
       "configSource": "<custom-config>",
       "provider": "cliproxyapi"
+    },
+    "cpl": {
+      "className": "ChatPlaygroundExecutor",
+      "configSource": "<custom-config>",
+      "provider": "chatplayground"
     },
     "cu": {
       "className": "CursorExecutor",
@@ -455,10 +455,20 @@
       "configSource": "<custom-config>",
       "provider": "notion-web"
     },
+    "notrack-web": {
+      "className": "NotrackWebExecutor",
+      "configSource": "<custom-config>",
+      "provider": "notrack-web"
+    },
     "nr": {
       "className": "NineRouterExecutor",
       "configSource": "<custom-config>",
       "provider": "9router"
+    },
+    "ntw": {
+      "className": "NotrackWebExecutor",
+      "configSource": "<custom-config>",
+      "provider": "notrack-web"
     },
     "nw": {
       "className": "NotionWebExecutor",
@@ -525,12 +535,12 @@
       "configSource": "qoder",
       "provider": "qoder"
     },
-    "t3-web": {
+    "t3chat": {
       "className": "T3ChatWebExecutor",
       "configSource": "<custom-config>",
       "provider": "t3-web"
     },
-    "t3chat": {
+    "t3-web": {
       "className": "T3ChatWebExecutor",
       "configSource": "<custom-config>",
       "provider": "t3-web"
@@ -585,12 +595,12 @@
       "configSource": "<custom-config>",
       "provider": "venice-web"
     },
-    "veo-free": {
+    "veoaifree-web": {
       "className": "VeoAIFreeWebExecutor",
       "configSource": "<custom-config>",
       "provider": "veoaifree-web"
     },
-    "veoaifree-web": {
+    "veo-free": {
       "className": "VeoAIFreeWebExecutor",
       "configSource": "<custom-config>",
       "provider": "veoaifree-web"
@@ -666,6 +676,6 @@
       "provider": "zai-web"
     }
   },
-  "keyCount": 133,
+  "keyCount": 135,
   "sharedInstances": []
 }
