@@ -99,6 +99,8 @@ export const USAGE_FETCHER_PROVIDERS = [
   "command-code",
   "conol-web",
   "cnl",
+  "syntx",
+  "stx",
   // AgentRouter (New-API) console balance (GET /api/user/self)
   "agentrouter",
   "kilocode",
