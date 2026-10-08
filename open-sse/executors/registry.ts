@@ -39,9 +39,8 @@ const lazyLoaders = new Map<string, () => Promise<BaseExecutor>>();
 const lazyInFlight = new Map<string, Promise<BaseExecutor>>();
 
 export function registerLazyExecutor(alias: string, load: () => Promise<BaseExecutor>): void {
-  // If re-evaluated under HMR / dev reload, overwrite lazy loader and clear cached instance
-  if (registry.has(alias)) {
-    registry.delete(alias);
+  if (registry.has(alias) || lazyLoaders.has(alias)) {
+    throw new Error(`executor alias already registered: "${alias}"`);
   }
   lazyLoaders.set(alias, load);
 }

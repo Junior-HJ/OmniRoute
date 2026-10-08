@@ -860,19 +860,12 @@ export async function parseUpstreamError(response: Response, provider: string | 
         : json.error?.message ||
           json.message ||
           (typeof json.detail === "string" ? json.detail : null) ||
-          json.msg ||
-          json.data?.Response?.Error?.Message ||
-          json.Response?.Error?.Message ||
           (typeof json.error === "string" ? json.error : null);
       message =
         typeof extractedMessage === "string"
           ? extractedMessage
           : `Upstream error: ${response.status}`;
-      errorCode =
-        json.error?.code ||
-        json.code ||
-        json.data?.Response?.Error?.Code ||
-        json.Response?.Error?.Code;
+      errorCode = json.error?.code || json.code;
       errorType = json.error?.type || json.type;
     } catch {
       message = text;
