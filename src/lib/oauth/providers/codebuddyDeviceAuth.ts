@@ -23,6 +23,25 @@ export interface CodeBuddyTokens {
   expires_in?: number;
 }
 
+interface CodeBuddyEnvelope<T> {
+  code?: number;
+  data?: T;
+  msg?: string;
+}
+
+interface CodeBuddyStatePayload {
+  state?: string | number;
+  authUrl?: string;
+  url?: string;
+}
+
+interface CodeBuddyTokenPayload {
+  accessToken?: string;
+  refreshToken?: string;
+  tokenType?: string;
+  expiresIn?: number;
+}
+
 export interface CodeBuddyPollResult {
   ok: boolean;
   data: Record<string, unknown> | CodeBuddyTokens;
@@ -53,7 +72,7 @@ export async function requestDeviceCode(
     throw new Error(`CodeBuddy state request failed (${response.status})`);
   }
 
-  const json = (await response.json()) as { code?: number; data?: any; msg?: string };
+  const json = (await response.json()) as CodeBuddyEnvelope<CodeBuddyStatePayload>;
   if (json.code !== 0 || !json.data?.state) {
     throw new Error(`CodeBuddy state error: ${json.msg || "no state in response"}`);
   }
@@ -90,7 +109,7 @@ export async function pollToken(
     },
   });
   if (!response.ok) return { ok: false, data: { error: "request_failed" } };
-  const data = (await response.json()) as { code?: number; data?: any; msg?: string };
+  const data = (await response.json()) as CodeBuddyEnvelope<CodeBuddyTokenPayload>;
   if (data.code === 0 && data.data?.accessToken) {
     return {
       ok: true,
