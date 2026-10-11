@@ -432,7 +432,8 @@ export function resolveExpiryFirstConfig(config: Record<string, unknown> | null 
  * the deadline when it is the only window, or when no longer window reports one.
  *
  * With burn telemetry, each window's expiring tranche is projected to its own
- * reset so a short session window is not scored using weekly burn.
+ * reset so a short session window is not scored using weekly burn, while the
+ * tightest-window bound on `usable` is preserved.
  *
  * Deliberately different from `scoreResetAwareQuota`, which ranks mostly on
  * leftover and adds `resetUrgency * (1 - remaining)` — a RECOVERY signal that
@@ -500,11 +501,7 @@ export function scoreExpiryFirstQuota(
       ? Math.min(100, configuredWeight)
       : 1;
   const burnRates = metrics?.burnFractionPerHourByWindow || {};
-  if (Object.keys(burnRates).length === 0) {
-    if (!Number.isFinite(msUntilReset)) return { score: usable * capacityWeight };
-    const legacyHours = Math.max(config.minHours, msUntilReset / (60 * 60 * 1000));
-    return { score: (usable * capacityWeight) / legacyHours };
-  }
+  if (!Number.isFinite(msUntilReset)) return { score: usable * capacityWeight };
 
   let score = 0;
   let hasReset = false;
@@ -512,12 +509,11 @@ export function scoreExpiryFirstQuota(
     const resetMs = parseResetTimeMs(window.resetAt);
     if (!Number.isFinite(resetMs)) continue;
     hasReset = true;
-    // A non-positive delta means the snapshot predates its reset. Clamp to
-    // minHours so it is rechecked promptly without inventing a reset deadline.
     const hours = Math.max(config.minHours, (resetMs - nowMs) / (60 * 60 * 1000));
     const remaining = clamp01(1 - (window.percentUsed ?? 0.5));
     const burnRate = Math.max(0, burnRates[key] ?? 0);
-    const predictedWaste = Math.max(0, remaining - burnRate * hours);
+    const projectedRemaining = Math.max(0, remaining - burnRate * hours);
+    const predictedWaste = Math.min(usable, projectedRemaining);
     score = Math.max(score, (predictedWaste * capacityWeight) / hours);
   }
   if (!hasReset) return { score: usable * capacityWeight };

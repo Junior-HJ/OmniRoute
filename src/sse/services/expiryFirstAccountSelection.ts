@@ -17,6 +17,7 @@ import { getQuotaCache } from "@/domain/quotaCache";
 import { toNumber } from "@/shared/utils/numeric";
 import {
   getExpiryFirstQuotaMetrics,
+  getExpiryFirstPlan,
   selectExpiryFirstQuotaWindowNames,
   type ExpiryFirstScope,
 } from "./expiryFirstMetrics.ts";
@@ -99,7 +100,11 @@ export function selectExpiryFirstConnection<T extends ExpiryFirstCandidate>(
     scope: ExpiryFirstScope,
     nowMs: number
   ) => ReturnType<typeof getExpiryFirstQuotaMetrics> = (connection, metricsScope) =>
-    getExpiryFirstQuotaMetrics(connection.id, connection.providerSpecificData?.plan, metricsScope)
+    getExpiryFirstQuotaMetrics(
+      connection.id,
+      getExpiryFirstPlan(connection.providerSpecificData),
+      metricsScope
+    )
 ): T | null {
   if (connections.length === 0) return null;
 

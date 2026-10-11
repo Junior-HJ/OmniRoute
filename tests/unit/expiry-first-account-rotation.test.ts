@@ -32,6 +32,8 @@ import {
   scoreExpiryFirstQuota,
 } from "@omniroute/open-sse/services/combo/quotaScoring.ts";
 import {
+  getExpiryFirstQuotaMetrics,
+  getExpiryFirstPlan,
   resolveExpiryFirstPlanWeight,
   selectExpiryFirstQuotaWindowNames,
 } from "@/sse/services/expiryFirstMetrics";
@@ -183,9 +185,27 @@ describe("expiry-first account rotation", () => {
   it("uses a detected plan weight and permits case-insensitive per-provider overrides", () => {
     assert.equal(resolveExpiryFirstPlanWeight("Ultra"), 4);
     assert.equal(resolveExpiryFirstPlanWeight("Pro"), 2);
+    assert.equal(resolveExpiryFirstPlanWeight("Claude Max"), 4);
+    assert.equal(resolveExpiryFirstPlanWeight("default_claude_max_20x"), 4);
+    assert.equal(resolveExpiryFirstPlanWeight("team"), 3);
+    assert.equal(resolveExpiryFirstPlanWeight("promax"), 2);
+    assert.equal(resolveExpiryFirstPlanWeight("prolite"), 2);
     assert.equal(resolveExpiryFirstPlanWeight("unknown"), 1);
     assert.equal(resolveExpiryFirstPlanWeight("uLtRa", { ultra: 6 }), 6);
     assert.equal(resolveExpiryFirstPlanWeight("Ultra", { ultra: 0 }), 4);
+    assert.equal(resolveExpiryFirstPlanWeight("Claude Max", { max: 5 }), 5);
+  });
+
+  it("reads plan labels from Antigravity, Codex, and Claude connection data", () => {
+    assert.equal(getExpiryFirstPlan({ plan: "Ultra", tier: "legacy-tier" }), "Ultra");
+    assert.equal(getExpiryFirstPlan({ workspacePlanType: "plus" }), "plus");
+    assert.equal(getExpiryFirstPlan({ chatgptPlanType: "pro" }), "pro");
+    assert.equal(
+      getExpiryFirstPlan({ workspacePlanType: "team", chatgptPlanType: "plus" }),
+      "plus"
+    );
+    assert.equal(getExpiryFirstPlan({ plan: "Max" }), "Max");
+    assert.equal(getExpiryFirstPlan({ tier: "legacy-tier" }), undefined);
   });
 
   it("orders equal quota pressure by the detected account plan capacity", () => {
@@ -228,6 +248,49 @@ describe("expiry-first account rotation", () => {
     // Session: (50% - 10%/h × 1h) × 2 / 1h = 0.8.
     // Weekly: (75% - 1%/h × 10h) × 2 / 10h = 0.13.
     assert.ok(Math.abs(weighted - 0.8) < 1e-9);
+  });
+
+  it("applies Codex and Claude plan fields when ranking equal quota pressure", () => {
+    const sameQuota = view(50, 2);
+    const codexAccounts: Account[] = [
+      { id: "plus", priority: 1, providerSpecificData: { workspacePlanType: "plus" } },
+      { id: "team", priority: 2, providerSpecificData: { chatgptPlanType: "team" } },
+    ];
+    const claudeAccounts: Account[] = [
+      { id: "pro", priority: 1, providerSpecificData: { plan: "Pro" } },
+      { id: "max", priority: 2, providerSpecificData: { plan: "Claude Max" } },
+    ];
+
+    assert.equal(
+      selectExpiryFirstConnection(codexAccounts, null, () => sameQuota, NOW, {
+        provider: "codex",
+        requestedModel: "gpt-5-codex",
+      })?.id,
+      "team"
+    );
+    assert.equal(
+      selectExpiryFirstConnection(claudeAccounts, null, () => sameQuota, NOW, {
+        provider: "anthropic",
+        requestedModel: "claude-sonnet",
+      })?.id,
+      "max"
+    );
+  });
+
+  it("keeps burn-aware scoring bounded by the tightest quota window", () => {
+    const config = resolveExpiryFirstConfig(null);
+    const quota = {
+      windows: {
+        session: { percentUsed: 0.95, resetAt: new Date(NOW + HOUR).toISOString() },
+        weekly: { percentUsed: 0.1, resetAt: new Date(NOW + 10 * HOUR).toISOString() },
+      },
+    };
+    const score = scoreExpiryFirstQuota(quota, config, NOW, {
+      capacityWeight: 1,
+      burnFractionPerHourByWindow: { session: 0.01, weekly: 0 },
+    }).score;
+
+    assert.ok(Math.abs(score - 0.04) < 1e-9);
   });
 
   it("scores predicted waste with plan capacity and measured burn", () => {
@@ -314,6 +377,28 @@ describe("expiry-first account rotation", () => {
       const burn = getQuotaCache(connectionId)?.burnMetrics?.rates["gemini-3.7-flash-high"];
       assert.ok(burn);
       assert.ok(burn.fractionPerHour > 0);
+    } finally {
+      Date.now = realNow;
+      __clearForTests();
+    }
+  });
+
+  it("normalizes cached burn window names to match the scoring view", () => {
+    const connectionId = "expiry-first-burn-window-case";
+    const resetAt = new Date(NOW + 3 * HOUR).toISOString();
+    const realNow = Date.now;
+    __clearForTests();
+    try {
+      Date.now = () => NOW - HOUR;
+      setQuotaCache(connectionId, "agy", { SESSION: { remainingPercentage: 80, resetAt } });
+      Date.now = () => NOW;
+      setQuotaCache(connectionId, "agy", { SESSION: { remainingPercentage: 60, resetAt } });
+
+      const metrics = getExpiryFirstQuotaMetrics(connectionId, "Pro", {
+        provider: "agy",
+        requestedModel: null,
+      });
+      assert.ok(metrics.burnFractionPerHourByWindow.session > 0);
     } finally {
       Date.now = realNow;
       __clearForTests();

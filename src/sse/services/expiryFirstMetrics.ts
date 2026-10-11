@@ -10,8 +10,10 @@ import { getCodexQuotaWindowFilterForModel } from "@omniroute/open-sse/config/co
 
 const DEFAULT_PLAN_WEIGHTS: Readonly<Record<string, number>> = Object.freeze({
   ultra: 4,
+  max: 4,
   enterprise: 3,
   business: 3,
+  team: 3,
   pro: 2,
   plus: 1.5,
   lite: 1,
@@ -41,20 +43,48 @@ function normalizedPlan(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
+function canonicalPlan(value: string): string {
+  const normalized = value.replace(/_/g, " ");
+  if (/^pro(max|lite)$/.test(normalized)) return "pro";
+  if (/\bultra\b/.test(normalized)) return "ultra";
+  if (/\bmax\b/.test(normalized)) return "max";
+  if (/\benterprise\b/.test(normalized)) return "enterprise";
+  if (/\b(business|team)\b/.test(normalized)) return "business";
+  if (/\bpro\b/.test(normalized)) return "pro";
+  if (/\bplus\b/.test(normalized)) return "plus";
+  if (/\blite\b/.test(normalized)) return "lite";
+  if (/\bfree\b/.test(normalized)) return "free";
+  return value;
+}
+
 export function resolveExpiryFirstPlanWeight(
   plan: unknown,
   overrides?: Record<string, number>
 ): number {
   const normalized = normalizedPlan(plan);
   if (!normalized) return 1;
+  const canonical = canonicalPlan(normalized);
 
   for (const [name, weight] of Object.entries(overrides || {})) {
-    if (normalizedPlan(name) === normalized && Number.isFinite(weight) && weight > 0) {
+    if (
+      (normalizedPlan(name) === normalized || canonicalPlan(normalizedPlan(name)) === canonical) &&
+      Number.isFinite(weight) &&
+      weight > 0
+    ) {
       return Math.min(100, weight);
     }
   }
 
-  return DEFAULT_PLAN_WEIGHTS[normalized] ?? 1;
+  return DEFAULT_PLAN_WEIGHTS[canonical] ?? 1;
+}
+
+export function getExpiryFirstPlan(connectionData: unknown): string | undefined {
+  if (!connectionData || typeof connectionData !== "object") return undefined;
+  const data = connectionData as Record<string, unknown>;
+  const plan = [data.plan, data.chatgptPlanType, data.workspacePlanType].find(
+    (value) => typeof value === "string" && value.trim()
+  );
+  return typeof plan === "string" ? plan : undefined;
 }
 
 export function selectExpiryFirstQuotaWindowNames(
@@ -85,7 +115,10 @@ export function getExpiryFirstQuotaMetrics(
   const scopedNames = selectExpiryFirstQuotaWindowNames(Object.keys(quotas), scope);
   const cachedBurnMetrics = filterQuotaBurnMetrics(entry?.burnMetrics, scopedNames);
   const burnFractionPerHourByWindow: Record<string, number> = Object.fromEntries(
-    Object.entries(cachedBurnMetrics?.rates || {}).map(([key, rate]) => [key, rate.fractionPerHour])
+    Object.entries(cachedBurnMetrics?.rates || {}).map(([key, rate]) => [
+      key.toLowerCase(),
+      rate.fractionPerHour,
+    ])
   );
   return {
     capacityWeight: resolveExpiryFirstPlanWeight(plan, scope.planWeights),
