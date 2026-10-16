@@ -1312,6 +1312,14 @@ async function handleChatCoreInner({
   // further down — see #8378 (context limit resolved by the combo was silently
   // discarded because it only existed inside this `if` block).
   let contextLimit = getTokenLimit(provider, effectiveModel);
+  const contextWindowChecksDisabled = areContextWindowChecksDisabled();
+  const effectiveInputCap = contextWindowChecksDisabled
+    ? null
+    : toPositiveInteger(
+        resolveInputTokenCapForGate({ provider, model: effectiveModel }, { isCombo })
+      );
+  const getEffectiveCompactionCeiling = (limit: number) =>
+    effectiveInputCap != null ? Math.min(limit, effectiveInputCap) : limit;
   // Strict model proofs cannot invoke auxiliary compression providers or prewarmers.
   // This trusted in-process fence is never accepted from a client header/body.
   if (!validationExecutorFence && body && Array.isArray(allMessages) && allMessages.length > 0) {
@@ -2009,6 +2017,7 @@ async function handleChatCoreInner({
       }
     }
 
+    const effectiveCompactionCeiling = getEffectiveCompactionCeiling(contextLimit);
     const COMPRESSION_THRESHOLD = (
       await import("@/lib/db/compression")
     ).getProactiveCompressionRatio();
@@ -2018,12 +2027,12 @@ async function handleChatCoreInner({
     }
     const threshold = Math.max(
       1,
-      Math.floor((Math.max(1, contextLimit) - reservedTokens) * COMPRESSION_THRESHOLD)
+      Math.floor((Math.max(1, effectiveCompactionCeiling) - reservedTokens) * COMPRESSION_THRESHOLD)
     );
 
     log?.debug?.(
       "CONTEXT",
-      `Checking compression: ${estimatedTokens} tokens vs ${threshold} threshold (${contextLimit} limit, ${reservedTokens} reserved)`
+      `Checking compression: ${estimatedTokens} tokens vs ${threshold} threshold (${effectiveCompactionCeiling} limit, ${reservedTokens} reserved)`
     );
 
     // Capture pre-compression body so translators can access original message
@@ -2045,7 +2054,7 @@ async function handleChatCoreInner({
         // separately as the threshold's reserve), unlike the full-breakdown
         // number the final guard rejects with — state the basis so the two
         // lines can be read side by side without a decoder ring.
-        `Proactive compression triggered: ${estimatedTokens} message tokens > ${threshold} threshold (${contextLimit} limit, tools reserve ${reservedTokens})`
+        `Proactive compression triggered: ${estimatedTokens} message tokens > ${threshold} threshold (${effectiveCompactionCeiling} limit, tools reserve ${reservedTokens})`
       );
 
       // Adapt Responses `input[]` → messages so compressContext can run, then restore.
@@ -2111,15 +2120,17 @@ async function handleChatCoreInner({
   const finalContextLimit = contextLimit;
   const toolsReserve = Array.isArray(body?.tools) ? estimateTokens(body.tools) : 0;
 
+  const effectiveCompactionCeiling = getEffectiveCompactionCeiling(finalContextLimit);
+
   // Last-resort compaction against the concrete input budget (not the 70% threshold).
   // Covers cases where the proactive pass was skipped or still left the request oversized (#8560).
   if (
     reactiveContextCompactionEnabled &&
     !nativeCodexPassthrough &&
-    finalEstimatedInputTokens >= finalContextLimit &&
+    finalEstimatedInputTokens >= effectiveCompactionCeiling &&
     body
   ) {
-    const lastResortTarget = Math.max(1, finalContextLimit - toolsReserve - 1);
+    const lastResortTarget = Math.max(1, effectiveCompactionCeiling - toolsReserve - 1);
     const lastResortAdapter = adaptBodyForCompression(body as Record<string, unknown>);
     const lastResortResult = compressContext(lastResortAdapter.body, {
       provider,
