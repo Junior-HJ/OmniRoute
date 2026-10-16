@@ -1,5 +1,8 @@
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
   terminateCodexHttpStreamOnTerminal,
   encodeResponseSseEvent,
@@ -8,6 +11,22 @@ import {
   isResponsesTerminalLine,
   RESPONSES_TERMINAL_EVENT_TYPES,
 } from "../../open-sse/executors/opencodeMuseSpark.ts";
+
+const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "omniroute-codex-terminal-"));
+process.env.DATA_DIR = TEST_DATA_DIR;
+process.env.OMNIROUTE_SSE_COMMENTS = "off";
+
+const core = await import("../../src/lib/db/core.ts");
+const { createSSETransformStreamWithLogger } = await import("../../open-sse/utils/stream.ts");
+
+after(() => {
+  core.resetDbInstance();
+  if (fs.existsSync(TEST_DATA_DIR)) {
+    for (const entry of fs.readdirSync(TEST_DATA_DIR)) {
+      fs.rmSync(path.join(TEST_DATA_DIR, entry), { recursive: true, force: true });
+    }
+  }
+});
 
 function sseResponse(body: string): Response {
   return new Response(body, {
@@ -170,5 +189,85 @@ describe("terminateCodexHttpStreamOnTerminal", () => {
     });
     const guarded = terminateCodexHttpStreamOnTerminal(json);
     assert.equal(await guarded.text(), '{"ok":true}');
+  });
+
+  it("keeps upstream Responses usage when the guarded body is translated to openai", async () => {
+    const upstreamUsage = { input_tokens: 17, output_tokens: 5, total_tokens: 22 };
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `event: response.output_text.delta\ndata: ${JSON.stringify({
+              type: "response.output_text.delta",
+              delta: "Hello",
+            })}\n\n`
+          )
+        );
+        controller.enqueue(
+          encoder.encode(
+            `event: response.completed\ndata: ${JSON.stringify({
+              type: "response.completed",
+              response: {
+                id: "resp_usage",
+                usage: upstreamUsage,
+                output: [
+                  {
+                    type: "message",
+                    role: "assistant",
+                    content: [{ type: "output_text", text: "Hello" }],
+                  },
+                ],
+              },
+            })}\n\n`
+          )
+        );
+        controller.enqueue(encoder.encode(": ping\n\n"));
+        controller.close();
+      },
+    });
+
+    const guarded = terminateCodexHttpStreamOnTerminal(
+      new Response(readable, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      })
+    );
+    assert.ok(guarded.body, "guarded SSE body must stay readable");
+
+    const transform = createSSETransformStreamWithLogger(
+      "openai-responses",
+      "openai",
+      "codex",
+      null,
+      null,
+      "gpt-5",
+      null,
+      { messages: [{ role: "user", content: "hi" }] }
+    );
+    const text = await new Response(guarded.body.pipeThrough(transform)).text();
+
+    assert.ok(text.endsWith("\n\n"), "translated SSE must end with the event terminator");
+    const usagePayloads = text
+      .split("\n")
+      .filter((line) => line.startsWith("data: ") && line.includes('"usage"'))
+      .map((line) => JSON.parse(line.slice("data: ".length)) as { usage?: Record<string, unknown> })
+      .map((payload) => payload.usage)
+      .filter((usage): usage is Record<string, unknown> => !!usage && typeof usage === "object");
+    const usage = usagePayloads.at(-1);
+    assert.ok(usage, "translated stream must include upstream usage");
+    assert.notEqual(usage.estimated, true);
+    assert.deepEqual(
+      {
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens: usage.total_tokens,
+      },
+      {
+        prompt_tokens: upstreamUsage.input_tokens,
+        completion_tokens: upstreamUsage.output_tokens,
+        total_tokens: upstreamUsage.total_tokens,
+      }
+    );
   });
 });

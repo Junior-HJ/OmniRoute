@@ -588,6 +588,7 @@ export function terminateCodexHttpStreamOnTerminal(response: Response): Response
             if (isResponsesTerminalLine(line)) {
               closed = true;
               void reader.cancel().catch(() => undefined);
+              controller.enqueue(encoder.encode("\n"));
               controller.close();
               return;
             }
