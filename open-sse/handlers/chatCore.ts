@@ -2162,18 +2162,13 @@ async function handleChatCoreInner({
   const modelOutputCap = toPositiveInteger(
     getExplicitModelOutputCap({ provider, model: effectiveModel })
   );
-  const contextWindowChecksDisabled = areContextWindowChecksDisabled();
   const outputBudget = enforceOutputTokenBudget(
     body as Record<string, unknown>,
     finalEstimatedInputTokens,
     contextWindowChecksDisabled ? Number.MAX_SAFE_INTEGER : finalContextLimit,
     targetFormat === FORMATS.CLAUDE && sourceFormat !== FORMATS.CLAUDE ? DEFAULT_MAX_TOKENS : 0,
     modelOutputCap,
-    contextWindowChecksDisabled
-      ? null
-      : toPositiveInteger(
-          resolveInputTokenCapForGate({ provider, model: effectiveModel }, { isCombo })
-        )
+    effectiveInputCap
   );
   if (outputBudget.ok === false) {
     const exceededInputCap = outputBudget.maxInputTokens !== undefined;
