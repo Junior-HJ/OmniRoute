@@ -20,7 +20,7 @@
 const NPM_OPENCODE_LATEST_URL = "https://registry.npmjs.org/opencode-ai/latest";
 
 /** Cold/offline fallback. Bump when the pin visibly lags the registry. */
-export const OPENCODE_CLI_VERSION_FALLBACK = "1.18.31";
+export const OPENCODE_CLI_VERSION_FALLBACK = "2.0.26";
 
 export const OPENCODE_CLI_VERSION_TTL_MS = 6 * 60 * 60 * 1000;
 

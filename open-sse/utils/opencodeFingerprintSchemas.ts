@@ -1,0 +1,87 @@
+// Verbatim CLI v2.0.26 tool schemas and definitions for OpenCode free tier fingerprint
+export const FINGERPRINT_TOOL_DEFINITIONS = {
+  read: {
+    description:
+      "Read the contents of a file or directory. Supports text files, images, and PDFs. Images and PDFs are presented directly to the model. Each text line is prefixed by its 1-based line number as <line>: <content>. The prefix is for reference and is not part of the file content. Directory entries are returned one per line. Use offset and limit to read large files or directories in sections. Prefer one larger read over many small slices, and use grep to find specific content in large files.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File or directory to read" },
+        offset: {
+          type: "integer",
+          minimum: 0,
+          description: "The line or directory entry to start reading from (1-based)",
+        },
+        limit: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "The maximum number of lines or directory entries to read (defaults to and capped at 2000)",
+        },
+      },
+      required: ["path"],
+    },
+  },
+  shell: {
+    description:
+      "Execute a shell command and return its output. Commands run on Linux using bash. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Rely on automatic truncation unless filtering the output is more useful. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately, and you will be notified when they complete.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "Shell command string to execute" },
+        workdir: {
+          type: "string",
+          description:
+            "Working directory to execute the command in. Defaults to the current working directory. When possible, avoid changing directories in the command and set the working directory here instead.",
+        },
+        timeout: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "Timeout in milliseconds. Set to 0 to disable the timeout. Defaults to 120000 for foreground commands. Background commands have no timeout by default.",
+        },
+        background: {
+          type: "boolean",
+          description:
+            "Run the command in the background and return immediately (useful for dev servers and long-running builds). You do not need to use '&' at the end of the command when using this parameter. You will be notified when it completes. DO NOT poll for completion.",
+        },
+      },
+      required: ["command"],
+    },
+  },
+} as const;
+
+export const DEFAULT_PLACEHOLDER_TOOL_NAMES = ["read", "shell"] as const;
+
+export function placeholderToolDescription(name: string): string {
+  return (
+    FINGERPRINT_TOOL_DEFINITIONS[name as keyof typeof FINGERPRINT_TOOL_DEFINITIONS]?.description ??
+    "Do not call this tool. It exists only for API compatibility and must never be invoked."
+  );
+}
+
+const PLACEHOLDER_TOOL_PARAMETERS = { type: "object", properties: {} } as const;
+
+const PLACEHOLDER_TOOL_PARAMETER_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
+  bash: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+  glob: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
+  grep: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
+  read: FINGERPRINT_TOOL_DEFINITIONS.read.parameters,
+  shell: FINGERPRINT_TOOL_DEFINITIONS.shell.parameters,
+};
+
+export function placeholderToolParameters(name: string): Record<string, unknown> {
+  return PLACEHOLDER_TOOL_PARAMETER_SCHEMAS[name] ?? PLACEHOLDER_TOOL_PARAMETERS;
+}
+
+export function sanitizeToolChoice<T extends Record<string, unknown>>(record: T): T {
+  if (
+    record.tool_choice === "none" ||
+    (typeof record.tool_choice === "object" &&
+      record.tool_choice !== null &&
+      (record.tool_choice as { type?: unknown })?.type === "none")
+  ) {
+    delete record.tool_choice;
+  }
+  return record;
+}

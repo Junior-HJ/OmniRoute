@@ -1,0 +1,1 @@
+- **fix(opencode):** update free-tier client fingerprint to OpenCode CLI v2.0.26 schemas, omit `x-opencode-request`, mirror session headers, and inject `Authorization: Bearer public` to fix 403 `FreeTierError` ([#16571](https://github.com/diegosouzapw/OmniRoute/issues/16571))

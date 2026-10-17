@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "crypto";
-import { setUserAgentHeader } from "../executors/base.ts";
+import { setUserAgentHeader } from "../executors/base/headers.ts";
 import { generateSessionId } from "../services/sessionManager.ts";
 import { getCachedOpencodeCliVersion, refreshOpencodeCliVersion } from "./opencodeCliVersion.ts";
 import {
@@ -12,7 +12,9 @@ import {
  * exists to be recent enough, not to impersonate a build: any `opencode/<>=1.17>` passes.
  * Overridable through the existing OPENCODE_USER_AGENT (or <PROVIDER>_USER_AGENT) knob.
  */
-export const DEFAULT_OPENCODE_USER_AGENT = "opencode/1.18.31";
+// OpenCode v2 UA shape: opencode/<channel>/<version>/<client>. Upstream rejects
+// the v1 "opencode/1.18.x" form with 403 FreeTierError since 2026-10-14.
+export const DEFAULT_OPENCODE_USER_AGENT = "opencode/latest/2.0.26/cli";
 
 /** Canonical OpenCode session id shape: `ses_` + 12 hex + 14 base62. */
 export const OPENCODE_SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
@@ -45,17 +47,21 @@ export function isValidOpencodeSessionValue(
   return OPENCODE_SESSION_TIME_PART_PATTERN.test(value.slice(4, 16)) ? value : undefined;
 }
 
-const MINIMUM_USER_AGENT_MINOR = 17;
-const USER_AGENT_VERSION_RE = /opencode\/(?:[a-z]+\/)?v?(\d+)\.(\d+)/i;
+const USER_AGENT_V2_RE = /^opencode\/[a-z0-9-]+\/(\d+)\.\d+\.\d+\/[a-z0-9-]+$/i;
+const USER_AGENT_VERSION_RE = /opencode\/(?:[a-z0-9-]+\/)?(?:v)?(\d+)\.(\d+)/i;
 
 /** Whether a User-Agent already satisfies the upstream contract, so it must be kept. */
 export function satisfiesOpencodeUserAgentContract(userAgent: string | null | undefined): boolean {
-  const match = String(userAgent || "").match(USER_AGENT_VERSION_RE);
+  const ua = String(userAgent || "").trim();
+  const v2Match = ua.match(USER_AGENT_V2_RE);
+  if (v2Match) {
+    return Number.parseInt(v2Match[1], 10) >= 2;
+  }
+  const match = ua.match(USER_AGENT_VERSION_RE);
   if (!match) return false;
   const major = Number.parseInt(match[1], 10);
-  const minor = Number.parseInt(match[2], 10);
-  if (!Number.isFinite(major) || !Number.isFinite(minor)) return false;
-  return major > 1 || (major === 1 && minor >= MINIMUM_USER_AGENT_MINOR);
+  if (!Number.isFinite(major)) return false;
+  return major >= 2;
 }
 
 // SDK and HTTP-library defaults: never an agent's own identity, so they are always
@@ -113,8 +119,8 @@ export function resolveOpencodeCliDefaults(
     userAgent:
       configuredUA && (!gated || satisfiesOpencodeUserAgentContract(configuredUA))
         ? configuredUA
-        : `opencode/${getCachedOpencodeCliVersion()}`,
-    client: process.env.OPENCODE_CLIENT?.trim() || "desktop",
+        : `opencode/latest/${getCachedOpencodeCliVersion()}/cli`,
+    client: process.env.OPENCODE_CLIENT?.trim() || "cli",
     project: process.env.OPENCODE_PROJECT?.trim() || "global",
   };
 }
@@ -369,11 +375,19 @@ function applyCliDefaults(
   // Both ids go out in the canonical shape. A client value already in that shape is kept;
   // anything else (a UUID from a generic client, an opaque conversation key) is translated
   // deterministically, so one client conversation still maps to one upstream session.
-  const clientRequestId = headers["x-opencode-request"]?.trim();
-  headers["x-opencode-request"] =
-    clientRequestId && OPENCODE_REQUEST_PATTERN.test(clientRequestId)
-      ? clientRequestId
-      : canonicalId("msg_", clientRequestId || undefined);
+  // On the free tier (reencodeSession), upstream rejects any x-opencode-request (v1 only)
+  // with 403 FreeTierError, so it must be omitted.
+  if (reencodeSession) {
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === "x-opencode-request") delete headers[key];
+    }
+  } else {
+    const clientRequestId = headers["x-opencode-request"]?.trim();
+    headers["x-opencode-request"] =
+      clientRequestId && OPENCODE_REQUEST_PATTERN.test(clientRequestId)
+        ? clientRequestId
+        : canonicalId("msg_", clientRequestId || undefined);
+  }
   // The free tier (zen) validates the session's *value*, not just its shape: a caller id
   // that matches `OPENCODE_SESSION_PATTERN` but carries an out-of-window counter (a
   // foreign or ascending encoding) still 403s upstream, so on that path only a genuine
@@ -387,9 +401,15 @@ function applyCliDefaults(
     : clientSessionId && OPENCODE_SESSION_PATTERN.test(clientSessionId)
       ? clientSessionId
       : undefined;
-  headers["x-opencode-session"] = clientSessionId
+  const session = clientSessionId
     ? (canonicalClientSession ?? canonicalId("ses_", clientSessionId))
     : canonicalId("ses_", generateSessionId(sessionBody ?? null) ?? undefined);
+  headers["x-opencode-session"] = session;
+  if (reencodeSession) {
+    headers["x-opencode-session-id"] = session;
+    headers["x-session-affinity"] = session;
+    headers["x-session-id"] = session;
+  }
 }
 
 /**

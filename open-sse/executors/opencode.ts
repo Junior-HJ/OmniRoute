@@ -1337,6 +1337,8 @@ export class OpencodeExecutor extends BaseExecutor {
       } else {
         headers["Authorization"] = `Bearer ${key}`;
       }
+    } else if (gatedScope && this._requestFormat !== "claude") {
+      headers["Authorization"] = "Bearer public";
     }
 
     if (this._requestFormat === "claude") {

@@ -295,29 +295,14 @@ export function configuredPlaceholderToolNames(): string[] {
   }
   return kept;
 }
-const PLACEHOLDER_TOOL_DESCRIPTION =
-  "Do not call this tool. It exists only for API compatibility and must never be invoked.";
-const PLACEHOLDER_TOOL_PARAMETERS = { type: "object", properties: {} } as const;
+import {
+  FINGERPRINT_TOOL_DEFINITIONS,
+  placeholderToolDescription,
+  placeholderToolParameters,
+  sanitizeToolChoice,
+} from "../utils/opencodeFingerprintSchemas.ts";
 
-/**
- * Minimal parameter schemas for injected placeholder tools, mirroring the OpenCode client's
- * argument names. Since 2026-10-14 the free tier refuses a declared `read` or `bash` whose
- * parameter object has no properties (measured on /inference/v1: `read` + `bash` with
- * `properties: {}` is 403, the same pair with `{command}` on `bash` is 200, and a request
- * with no property-bearing `read` is 403), while an empty schema on a name outside the
- * quartet (`webfetch`, `_noop`) still passes.
- */
-const PLACEHOLDER_TOOL_PARAMETER_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
-  bash: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
-  glob: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
-  grep: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
-  read: { type: "object", properties: { filePath: { type: "string" } }, required: ["filePath"] },
-};
-
-/** Parameter schema for an injected placeholder tool named `name`. */
-export function placeholderToolParameters(name: string): Record<string, unknown> {
-  return PLACEHOLDER_TOOL_PARAMETER_SCHEMAS[name] ?? PLACEHOLDER_TOOL_PARAMETERS;
-}
+export { placeholderToolDescription, placeholderToolParameters };
 
 /**
  * Bring a free-tier request up to the upstream contract, without overriding anything the
@@ -343,6 +328,7 @@ export function applyFreeTierRequestContract<T>(
   if (!body || typeof body !== "object" || Array.isArray(body)) return body;
   const record = body as Record<string, unknown>;
   const next: Record<string, unknown> = { ...record, stream: true };
+  sanitizeToolChoice(next);
 
   const existingNames = new Set(clientToolNamesOf(next));
   const baseNames = placeholderNames.length > 0 ? placeholderNames : [PLACEHOLDER_TOOL_NAME];
@@ -358,7 +344,7 @@ export function applyFreeTierRequestContract<T>(
       ...namesToAdd.map((name) => ({
         type: "function",
         name,
-        description: PLACEHOLDER_TOOL_DESCRIPTION,
+        description: placeholderToolDescription(name),
         parameters: placeholderToolParameters(name),
       })),
     ];
@@ -372,7 +358,7 @@ export function applyFreeTierRequestContract<T>(
         type: "function",
         function: {
           name,
-          description: PLACEHOLDER_TOOL_DESCRIPTION,
+          description: placeholderToolDescription(name),
           parameters: placeholderToolParameters(name),
         },
       })),
@@ -425,7 +411,7 @@ export function mergeClientToolsWithObserved<T>(
       ...missing.map((name) => ({
         type: "function",
         name,
-        description: PLACEHOLDER_TOOL_DESCRIPTION,
+        description: placeholderToolDescription(name),
         parameters: placeholderToolParameters(name),
       })),
     ];
@@ -438,7 +424,7 @@ export function mergeClientToolsWithObserved<T>(
         type: "function",
         function: {
           name,
-          description: PLACEHOLDER_TOOL_DESCRIPTION,
+          description: placeholderToolDescription(name),
           parameters: placeholderToolParameters(name),
         },
       })),
@@ -522,11 +508,18 @@ export function prepareFreeTierRequest<T>(
       replayNote: (verdict) => noteFreeTierOutcome({ ...attempt, probe: false }, verdict),
     });
   }
+  if (chosen === "bare") {
+    const streamed = withStreaming(body);
+    if (streamed && typeof streamed === "object" && !Array.isArray(streamed)) {
+      sanitizeToolChoice(streamed as Record<string, unknown>);
+    }
+    return {
+      body: streamed,
+      attempt,
+    };
+  }
   return {
-    body:
-      chosen === "bare"
-        ? withStreaming(body)
-        : applyFreeTierRequestContract(body, requestFormat, names),
+    body: applyFreeTierRequestContract(body, requestFormat, names),
     attempt,
   };
 }
