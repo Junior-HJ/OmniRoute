@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 /**
  * WorkBuddy gateway compliance utilities (Issue #16978).
@@ -58,7 +58,9 @@ function answeredBefore(msgs: Array<Record<string, unknown>>, i: number): boolea
 }
 
 export function turnKey(chat: Record<string, unknown> | null): string {
-  const msgs = Array.isArray(chat?.messages) ? (chat.messages as Array<Record<string, unknown>>) : [];
+  const msgs = Array.isArray(chat?.messages)
+    ? (chat.messages as Array<Record<string, unknown>>)
+    : [];
   for (let i = msgs.length - 1; i >= 0; i--) {
     if (msgs[i]?.role !== "user" || answeredBefore(msgs, i)) continue;
     const sig = signatureOf(msgs[i].content);
@@ -69,7 +71,9 @@ export function turnKey(chat: Record<string, unknown> | null): string {
 
 export function conversationKey(chat: Record<string, unknown> | null, session?: string): string {
   if (session) return `session:${session}`;
-  const msgs = Array.isArray(chat?.messages) ? (chat.messages as Array<Record<string, unknown>>) : [];
+  const msgs = Array.isArray(chat?.messages)
+    ? (chat.messages as Array<Record<string, unknown>>)
+    : [];
   for (const m of msgs) {
     if (m?.role !== "user") continue;
     const sig = signatureOf(m?.content);
@@ -129,7 +133,19 @@ export function withWorkbuddyHeaders<T extends Record<string, string> | Headers>
 const NAME_OK = /^[A-Za-z0-9_-]+$/;
 const NUL_ESCAPE = /\\\\|\\0(?![0-9])/g;
 const TYPES = new Set(["string", "number", "integer", "boolean", "object", "array", "null"]);
-const SUB_ONE = ["items", "additionalItems", "unevaluatedItems", "contains", "not", "if", "then", "else", "propertyNames", "additionalProperties", "unevaluatedProperties"];
+const SUB_ONE = [
+  "items",
+  "additionalItems",
+  "unevaluatedItems",
+  "contains",
+  "not",
+  "if",
+  "then",
+  "else",
+  "propertyNames",
+  "additionalProperties",
+  "unevaluatedProperties",
+];
 const SUB_LIST = ["anyOf", "oneOf", "allOf", "prefixItems"];
 const SUB_MAP = ["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"];
 const BOOL_OK = new Set(["additionalProperties", "unevaluatedProperties"]);
@@ -142,31 +158,36 @@ function safeToolName(name: string, taken: Set<string>): string {
   return n;
 }
 
+function fitNulPattern(obj: Record<string, unknown>): boolean {
+  if (typeof obj.pattern !== "string" || !obj.pattern.includes("\\0")) return false;
+  const p = obj.pattern.replace(NUL_ESCAPE, (m) => (m === "\\\\" ? m : "\\u0000"));
+  if (p === obj.pattern) return false;
+  obj.pattern = p;
+  return true;
+}
+
+function fitTupleItems(obj: Record<string, unknown>): boolean {
+  if (!Array.isArray(obj.items)) return false;
+  const list = obj.items.filter((v) => v && typeof v === "object");
+  obj.items = list.length === 0 ? {} : list.length === 1 ? list[0] : { anyOf: list };
+  delete obj.additionalItems;
+  return true;
+}
+
+function fitSchemaEach(values: unknown[], depth: number): boolean {
+  let changed = false;
+  for (const v of values) if (fitSchema(v, depth)) changed = true;
+  return changed;
+}
+
 export function fitSchema(s: unknown, depth = 0): boolean {
   if (!s || typeof s !== "object" || depth > 64) return false;
-  let changed = false;
-  if (Array.isArray(s)) {
-    for (const v of s) if (fitSchema(v, depth + 1)) changed = true;
-    return changed;
-  }
+  if (Array.isArray(s)) return fitSchemaEach(s, depth + 1);
   const obj = s as Record<string, unknown>;
-  if (typeof obj.pattern === "string" && obj.pattern.includes("\\0")) {
-    const p = obj.pattern.replace(NUL_ESCAPE, (m) => (m === "\\\\" ? m : "\\u0000"));
-    if (p !== obj.pattern) {
-      obj.pattern = p;
-      changed = true;
-    }
-  }
-  if (Array.isArray(obj.items)) {
-    const list = obj.items.filter((v) => v && typeof v === "object");
-    obj.items = list.length === 0 ? {} : list.length === 1 ? list[0] : { anyOf: list };
-    delete obj.additionalItems;
-    changed = true;
-  }
-  for (const v of Object.values(obj)) {
-    if (fitSchema(v, depth + 1)) changed = true;
-  }
-  return changed;
+  const pattern = fitNulPattern(obj);
+  const items = fitTupleItems(obj);
+  const nested = fitSchemaEach(Object.values(obj), depth + 1);
+  return pattern || items || nested;
 }
 
 function valueType(v: unknown): string {
@@ -176,32 +197,43 @@ function valueType(v: unknown): string {
   return typeof v;
 }
 
-function fitEnum(s: Record<string, unknown>): boolean {
-  if (!("enum" in s)) return false;
-  if (!Array.isArray(s.enum) || s.enum.length === 0) {
-    delete s.enum;
-    return true;
-  }
-  const listed = Array.isArray(s.type) ? s.type : typeof s.type === "string" ? [s.type] : [];
-  if (listed.filter((t) => t !== "null").length === 1) return false;
+function listedTypes(s: Record<string, unknown>): unknown[] {
+  if (Array.isArray(s.type)) return s.type;
+  return typeof s.type === "string" ? [s.type] : [];
+}
+
+function groupEnumByType(values: unknown[]): Map<string, unknown[]> {
   const byType = new Map<string, unknown[]>();
-  for (const v of s.enum) {
+  for (const v of values) {
     const t = valueType(v);
-    if (!byType.has(t)) byType.set(t, []);
-    byType.get(t)!.push(v);
+    const group = byType.get(t);
+    if (group) group.push(v);
+    else byType.set(t, [v]);
   }
   if (byType.has("integer") && byType.has("number")) {
     byType.get("number")!.push(...byType.get("integer")!);
     byType.delete("integer");
   }
-  const hasNull = byType.delete("null");
-  if (byType.size <= 1) {
-    const [t] = byType.keys();
-    const want = t === undefined ? "null" : hasNull ? [t, "null"] : t;
-    if (JSON.stringify(want) === JSON.stringify(s.type)) return false;
-    s.type = want;
-    return true;
-  }
+  return byType;
+}
+
+function setSingleEnumType(
+  s: Record<string, unknown>,
+  byType: Map<string, unknown[]>,
+  hasNull: boolean
+): boolean {
+  const [t] = byType.keys();
+  const want = t === undefined ? "null" : hasNull ? [t, "null"] : t;
+  if (JSON.stringify(want) === JSON.stringify(s.type)) return false;
+  s.type = want;
+  return true;
+}
+
+function splitEnumByType(
+  s: Record<string, unknown>,
+  byType: Map<string, unknown[]>,
+  hasNull: boolean
+): boolean {
   const split: unknown[] = [...byType].map(([t, vs]) => ({ type: t, enum: vs }));
   if (hasNull) split.push({ type: "null" });
   delete s.enum;
@@ -214,114 +246,184 @@ function fitEnum(s: Record<string, unknown>): boolean {
   return true;
 }
 
+function fitEnum(s: Record<string, unknown>): boolean {
+  if (!("enum" in s)) return false;
+  if (!Array.isArray(s.enum) || s.enum.length === 0) {
+    delete s.enum;
+    return true;
+  }
+  if (listedTypes(s).filter((t) => t !== "null").length === 1) return false;
+  const byType = groupEnumByType(s.enum);
+  const hasNull = byType.delete("null");
+  return byType.size <= 1
+    ? setSingleEnumType(s, byType, hasNull)
+    : splitEnumByType(s, byType, hasNull);
+}
+
 function subSchema(v: unknown, key: string): unknown {
   if (typeof v !== "boolean" || BOOL_OK.has(key)) return v;
   return v ? {} : { not: {} };
 }
 
-export function fitShape(s: unknown, depth = 0): boolean {
-  if (!s || typeof s !== "object" || Array.isArray(s) || depth > 64) return false;
-  const obj = s as Record<string, unknown>;
-  let changed = false;
-  if ("type" in obj) {
-    const list = (Array.isArray(obj.type) ? obj.type : [obj.type])
-      .map((t) => (typeof t === "string" ? t.toLowerCase() : t))
-      .filter((t) => TYPES.has(t as string));
-    const uniq = [...new Set(list)];
-    const want = uniq.length === 0 ? undefined : uniq.length === 1 ? uniq[0] : uniq;
-    if (JSON.stringify(want) !== JSON.stringify(obj.type)) {
-      if (want === undefined) delete obj.type;
-      else obj.type = want;
-      changed = true;
-    }
-  }
+function fitType(obj: Record<string, unknown>): boolean {
+  if (!("type" in obj)) return false;
+  const list = (Array.isArray(obj.type) ? obj.type : [obj.type])
+    .map((t) => (typeof t === "string" ? t.toLowerCase() : t))
+    .filter((t) => TYPES.has(t as string));
+  const uniq = [...new Set(list)];
+  const want = uniq.length === 0 ? undefined : uniq.length === 1 ? uniq[0] : uniq;
+  if (JSON.stringify(want) === JSON.stringify(obj.type)) return false;
+  if (want === undefined) delete obj.type;
+  else obj.type = want;
+  return true;
+}
+
+function fitRequired(obj: Record<string, unknown>): boolean {
   if ("required" in obj && !Array.isArray(obj.required)) {
     delete obj.required;
-    changed = true;
-  } else if (Array.isArray(obj.required) && obj.required.some((k) => typeof k !== "string")) {
+    return true;
+  }
+  if (Array.isArray(obj.required) && obj.required.some((k) => typeof k !== "string")) {
     obj.required = obj.required.filter((k) => typeof k === "string");
-    changed = true;
+    return true;
   }
-  if (fitEnum(obj)) changed = true;
+  return false;
+}
+
+/** Normalize one sub-schema slot in place, then recurse into it. */
+function fitSlot(
+  container: Record<string | number, unknown>,
+  slot: string | number,
+  key: string,
+  depth: number
+): boolean {
+  const v0 = container[slot];
+  const v = subSchema(v0, key);
+  const replaced = v !== v0;
+  if (replaced) container[slot] = v;
+  const nested = fitShape(v, depth + 1);
+  return replaced || nested;
+}
+
+function fitSubOne(obj: Record<string, unknown>, depth: number): boolean {
+  let changed = false;
   for (const k of SUB_ONE) {
-    if (!(k in obj)) continue;
-    const v = subSchema(obj[k], k);
-    if (v !== obj[k]) {
-      obj[k] = v;
-      changed = true;
-    }
-    if (fitShape(v, depth + 1)) changed = true;
+    if (k in obj && fitSlot(obj, k, k, depth)) changed = true;
   }
+  return changed;
+}
+
+function fitSubList(obj: Record<string, unknown>, depth: number): boolean {
+  let changed = false;
   for (const k of SUB_LIST) {
-    if (!Array.isArray(obj[k])) continue;
-    const list = obj[k] as unknown[];
-    list.forEach((v0, i) => {
-      const v = subSchema(v0, k);
-      if (v !== v0) {
-        list[i] = v;
-        changed = true;
-      }
-      if (fitShape(v, depth + 1)) changed = true;
+    const list = obj[k];
+    if (!Array.isArray(list)) continue;
+    list.forEach((_, i) => {
+      if (fitSlot(list as unknown as Record<number, unknown>, i, k, depth)) changed = true;
     });
   }
+  return changed;
+}
+
+function fitSubMap(obj: Record<string, unknown>, depth: number): boolean {
+  let changed = false;
   for (const k of SUB_MAP) {
     const m = obj[k];
     if (!m || typeof m !== "object" || Array.isArray(m)) continue;
-    for (const [name, v0] of Object.entries(m as Record<string, unknown>)) {
-      const v = subSchema(v0, k);
-      if (v !== v0) {
-        (m as Record<string, unknown>)[name] = v;
-        changed = true;
-      }
-      if (fitShape(v, depth + 1)) changed = true;
+    for (const name of Object.keys(m)) {
+      if (fitSlot(m as Record<string, unknown>, name, k, depth)) changed = true;
     }
   }
   return changed;
 }
 
-export function fitTools(body: Record<string, unknown>): { changed: boolean; names: Map<string, string> } {
-  const names = new Map<string, string>();
-  if (!Array.isArray(body?.tools) || !body.tools.length) return { changed: false, names };
-  let changed = false;
+export function fitShape(s: unknown, depth = 0): boolean {
+  if (!s || typeof s !== "object" || Array.isArray(s) || depth > 64) return false;
+  const obj = s as Record<string, unknown>;
+  const results = [
+    fitType(obj),
+    fitRequired(obj),
+    fitEnum(obj),
+    fitSubOne(obj, depth),
+    fitSubList(obj, depth),
+    fitSubMap(obj, depth),
+  ];
+  return results.some(Boolean);
+}
+
+function collectValidToolNames(tools: Array<Record<string, unknown>>): Set<string> {
   const taken = new Set<string>();
-  for (const t of body.tools as Array<Record<string, unknown>>) {
-    const fn = t?.function as Record<string, unknown> | undefined;
-    const n = fn?.name;
+  for (const t of tools) {
+    const n = (t?.function as Record<string, unknown> | undefined)?.name;
     if (typeof n === "string" && NAME_OK.test(n)) taken.add(n);
   }
+  return taken;
+}
+
+function toolFunction(t: Record<string, unknown>): Record<string, unknown> | null {
+  const fn = t?.type === "function" || t?.function ? t.function : null;
+  return fn && typeof fn === "object" ? (fn as Record<string, unknown>) : null;
+}
+
+function fitToolParameters(fn: Record<string, unknown>): boolean {
+  if (fn.parameters === undefined) return false;
+  if (!fn.parameters || typeof fn.parameters !== "object" || Array.isArray(fn.parameters)) {
+    fn.parameters = { type: "object", properties: {} };
+    return true;
+  }
+  const schema = fitSchema(fn.parameters);
+  const shape = fitShape(fn.parameters);
+  return schema || shape;
+}
+
+function fitToolFunction(
+  fn: Record<string, unknown>,
+  taken: Set<string>,
+  names: Map<string, string>,
+  theirs: Map<string, string>
+): boolean {
+  let renamed = false;
+  if (typeof fn.name === "string" && !NAME_OK.test(fn.name)) {
+    const safe = safeToolName(fn.name, taken);
+    names.set(safe, fn.name);
+    theirs.set(fn.name, safe);
+    fn.name = safe;
+    renamed = true;
+  }
+  const params = fitToolParameters(fn);
+  return renamed || params;
+}
+
+function renameMessageToolRefs(m: Record<string, unknown>, theirs: Map<string, string>): void {
+  if (Array.isArray(m?.tool_calls)) {
+    for (const c of m.tool_calls as Array<Record<string, unknown>>) {
+      const fn = c?.function as Record<string, unknown> | undefined;
+      const safe = theirs.get(fn?.name as string);
+      if (safe && fn) fn.name = safe;
+    }
+  }
+  if (m?.role === "tool" && typeof m.name === "string" && theirs.has(m.name)) {
+    m.name = theirs.get(m.name)!;
+  }
+}
+
+export function fitTools(body: Record<string, unknown>): {
+  changed: boolean;
+  names: Map<string, string>;
+} {
+  const names = new Map<string, string>();
+  if (!Array.isArray(body?.tools) || !body.tools.length) return { changed: false, names };
+  const tools = body.tools as Array<Record<string, unknown>>;
+  const taken = collectValidToolNames(tools);
   const theirs = new Map<string, string>();
-  for (const t of body.tools as Array<Record<string, unknown>>) {
-    const fn = (t?.type === "function" || t?.function ? t.function : null) as Record<string, unknown> | null;
-    if (!fn || typeof fn !== "object") continue;
-    if (typeof fn.name === "string" && !NAME_OK.test(fn.name)) {
-      const safe = safeToolName(fn.name, taken);
-      names.set(safe, fn.name);
-      theirs.set(fn.name, safe);
-      fn.name = safe;
-      changed = true;
-    }
-    if (fn.parameters === undefined) continue;
-    if (!fn.parameters || typeof fn.parameters !== "object" || Array.isArray(fn.parameters)) {
-      fn.parameters = { type: "object", properties: {} };
-      changed = true;
-      continue;
-    }
-    if (fitSchema(fn.parameters)) changed = true;
-    if (fitShape(fn.parameters)) changed = true;
+  let changed = false;
+  for (const t of tools) {
+    const fn = toolFunction(t);
+    if (fn && fitToolFunction(fn, taken, names, theirs)) changed = true;
   }
   if (theirs.size && Array.isArray(body.messages)) {
-    for (const m of body.messages as Array<Record<string, unknown>>) {
-      if (Array.isArray(m?.tool_calls)) {
-        for (const c of m.tool_calls as Array<Record<string, unknown>>) {
-          const fn = c?.function as Record<string, unknown> | undefined;
-          const safe = theirs.get(fn?.name as string);
-          if (safe && fn) fn.name = safe;
-        }
-      }
-      if (m?.role === "tool" && typeof m.name === "string" && theirs.has(m.name)) {
-        m.name = theirs.get(m.name)!;
-      }
-    }
+    for (const m of body.messages as Array<Record<string, unknown>>)
+      renameMessageToolRefs(m, theirs);
   }
   return { changed, names };
 }

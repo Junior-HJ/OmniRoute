@@ -10,8 +10,6 @@ import {
   fitShape,
   sanitizeToolChoice,
   sanitizeWorkbuddyBody,
-  turnKey,
-  conversationKey,
 } from "../../open-sse/utils/workbuddyGateway.ts";
 
 test("workbuddy default headers enforce client identity and craft purpose", () => {
@@ -83,25 +81,27 @@ test("fitTools sanitizes tool names and parameter schemas", () => {
 
   const { changed, names } = fitTools(body);
   assert.equal(changed, true);
-  const fn = (body.tools[0] as any).function;
+  const fn = body.tools[0].function;
   assert.equal(fn.name, "mcp_read_file");
   assert.equal(names.get("mcp_read_file"), "mcp:read.file");
-  assert.equal((body.messages[0] as any).tool_calls[0].function.name, "mcp_read_file");
+  assert.equal(body.messages[0].tool_calls[0].function.name, "mcp_read_file");
   assert.equal(fn.parameters.pattern, "test\\u0000end");
   assert.deepEqual(fn.parameters.items, { anyOf: [{ type: "string" }, { type: "number" }] });
 });
 
 test("sanitizeToolChoice converts OpenAI object format to string", () => {
-  const b1: any = { tool_choice: "none", tools: [{ name: "t" }] };
+  const b1: Record<string, unknown> = { tool_choice: "none", tools: [{ name: "t" }] };
   sanitizeToolChoice(b1);
   assert.equal(b1.tool_choice, undefined);
   assert.equal(b1.tools, undefined);
 
-  const b2: any = { tool_choice: { type: "function", function: { name: "search" } } };
+  const b2: Record<string, unknown> = {
+    tool_choice: { type: "function", function: { name: "search" } },
+  };
   sanitizeToolChoice(b2);
   assert.equal(b2.tool_choice, "search");
 
-  const b3: any = { tool_choice: { type: "auto" } };
+  const b3: Record<string, unknown> = { tool_choice: { type: "auto" } };
   sanitizeToolChoice(b3);
   assert.equal(b3.tool_choice, "auto");
 });
@@ -118,16 +118,53 @@ test("sanitizeWorkbuddyBody handles system prompt injection, token aliases and G
     ],
   };
 
-  const out = sanitizeWorkbuddyBody(input) as any;
+  const out = sanitizeWorkbuddyBody(input) as {
+    max_tokens?: number;
+    max_completion_tokens?: number;
+    messages: Array<{ role: string; content?: unknown }>;
+  };
   assert.equal(out.max_tokens, 1024);
   assert.equal(out.max_completion_tokens, undefined);
   assert.equal(out.messages[0].role, "system");
   assert.equal(out.messages[0].content, "Act as expert");
 
   // Gemini turn alignment check: empty assistant message padded before user message
-  const lastToolIdx = out.messages.findIndex((m: any) => m.role === "tool");
+  const lastToolIdx = out.messages.findIndex((m) => m.role === "tool");
   assert.equal(out.messages[lastToolIdx + 1].role, "assistant");
   assert.equal(out.messages[lastToolIdx + 1].content, "");
   assert.equal(out.messages[lastToolIdx + 2].role, "user");
   assert.equal(out.messages[lastToolIdx + 2].content, "next instruction");
+});
+
+test("fitSchema and fitShape normalize nested schemas and report whether they changed", () => {
+  const schema: Record<string, unknown> = {
+    type: ["OBJECT", "bogus"],
+    required: ["a", 1],
+    properties: {
+      a: { type: "string", pattern: "x\\0y" },
+      b: false,
+      c: { enum: [1, 2.5, "s", null] },
+    },
+    anyOf: [true, { type: "integer" }],
+    items: [{ type: "string" }],
+  };
+
+  assert.equal(fitSchema(schema), true);
+  assert.equal(fitShape(schema), true);
+  assert.equal(schema.type, "object");
+  assert.deepEqual(schema.required, ["a"]);
+  assert.deepEqual(schema.items, { type: "string" });
+  const props = schema.properties as Record<string, Record<string, unknown>>;
+  assert.equal(props.a.pattern, "x\\u0000y");
+  assert.deepEqual(props.b, { not: {} });
+  assert.deepEqual(props.c.anyOf, [
+    { type: "number", enum: [2.5, 1] },
+    { type: "string", enum: ["s"] },
+    { type: "null" },
+  ]);
+  assert.deepEqual(schema.anyOf, [{}, { type: "integer" }]);
+
+  // Already normalized: a second pass is a no-op.
+  assert.equal(fitSchema(schema), false);
+  assert.equal(fitShape(schema), false);
 });
