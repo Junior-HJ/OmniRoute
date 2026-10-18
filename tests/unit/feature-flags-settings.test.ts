@@ -60,6 +60,11 @@ const {
 // default off) to 87.
 // NATIVE_CODEX_REACTIVE_COMPACTION_ENABLED (#16632, default off) to 88.
 const EXPECTED_FEATURE_FLAG_COUNT = 88;
+// COOLDOWN_RETRY_SKIP_REFUSALS_ENABLED (#16305, default off) takes it to 88.
+// default off) to 87; QUOTA_WINDOW_BOUNDED_PARK
+// (#17000, per-window quota policy honours the bounded park, default off) to 88.
+// default off) to 87; IMAGE_GENERATION_LONG_JOBS
+// (#16260, connection image timeout + caller cancellation + Playground SSE, default off) to 88.
 
 // ──────────────────────────────────────────────────────
 // Test group 1 — Flag definitions registry

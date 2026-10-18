@@ -116,6 +116,7 @@ import { createRequestLogger } from "../utils/requestLogger.ts";
 import { createPreparedRequestLogger } from "../utils/providerRequestLogging.ts";
 import { summarizeToolSources } from "../utils/toolSources.ts";
 import { applyClaudeEffortVariant } from "./chatCore/claudeEffortVariant.ts";
+import { applyKimiCodingEffortVariant } from "./chatCore/kimiCodingEffortVariant.ts";
 import {
   getStripTypesForProviderModel,
   stripIncompatibleMessageContent,
@@ -710,6 +711,13 @@ async function handleChatCoreInner({
     if (effortVariant.log) {
       log?.info?.("PARAMS", effortVariant.log);
     }
+  }
+  // Kimi Coding serves bare ids and takes effort in the body: `kimi-k3-high` → `k3` +
+  // reasoning_effort=high (#16985). Scoped to kimi-coding/kimi-coding-apikey registry ids.
+  {
+    const kimiVariant = applyKimiCodingEffortVariant({ provider, effectiveModel, body });
+    effectiveModel = kimiVariant.effectiveModel;
+    if (kimiVariant.log) log?.info?.("PARAMS", kimiVariant.log);
   }
 
   // Wire target-format resolution extracted to chatCore/targetFormat.ts (#3501); `alias` is reused
