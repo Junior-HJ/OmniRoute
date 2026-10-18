@@ -4,6 +4,7 @@ import {
   mergeInjectedFallbackOwnerNames,
 } from "./chatCore/memorySkillsInjection.ts";
 import { resolveChatCoreRequestSetup } from "./chatCore/requestSetup.ts";
+import { shouldSkipNativeCodexReactiveCompaction } from "./chatCore/nativeCodexCompaction.ts";
 import {
   normalizeOpenAICompatibleTools,
   shouldNormalizeFunctionToolsOnly,
@@ -1178,6 +1179,12 @@ async function handleChatCoreInner({
   // reactive and last-resort compaction passes. Otherwise an operator selecting
   // "off" still has large histories rewritten by trim_tools/purify_history.
   let reactiveContextCompactionEnabled = false;
+  // Native Codex history stays out of reactive/last-resort compaction unless the default-off
+  // NATIVE_CODEX_REACTIVE_COMPACTION_ENABLED flag opts in (#16632; fails closed).
+  const skipNativeCodexReactiveCompaction = shouldSkipNativeCodexReactiveCompaction(
+    nativeCodexPassthrough,
+    isFeatureFlagEnabled
+  );
   // Hoisted to function scope (not just the compression-block scope below) so the
   // combo-resolved override survives to the final enforceOutputTokenBudget() call
   // further down — see #8378 (context limit resolved by the combo was silently
@@ -1204,8 +1211,8 @@ async function handleChatCoreInner({
     // → restore) with codex tool-output eligibility guards, so native contexts still
     // compress (regression: #8933 introduced the passthrough bypass, landed on release
     // via #11088, silencing codex analytics to skip_reason='excluded'). Reactive
-    // compaction + combo overflow fail-fast below still bypass native passthrough —
-    // intentionally left for follow-up. Operators who want byte-identical passthrough
+    // compaction + combo overflow fail-fast below still bypass native passthrough by
+    // default (reactive compaction is opt-in via NATIVE_CODEX_REACTIVE_COMPACTION_ENABLED). Operators who want byte-identical passthrough
     // can add `codex/*` to the exclusions list.
     const compressionExcluded = isCompressionExcluded(
       { provider, model: effectiveModel },
@@ -1805,7 +1812,7 @@ async function handleChatCoreInner({
     // at the budget check below (#8560).
     if (
       reactiveContextCompactionEnabled &&
-      !nativeCodexPassthrough &&
+      !skipNativeCodexReactiveCompaction &&
       estimatedTokens > threshold
     ) {
       log?.info?.(
@@ -1897,7 +1904,7 @@ async function handleChatCoreInner({
   // Covers cases where the proactive pass was skipped or still left the request oversized (#8560).
   if (
     reactiveContextCompactionEnabled &&
-    !nativeCodexPassthrough &&
+    !skipNativeCodexReactiveCompaction &&
     finalEstimatedInputTokens >= effectiveCompactionCeiling &&
     body
   ) {
