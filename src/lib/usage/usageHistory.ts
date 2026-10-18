@@ -35,6 +35,7 @@ import {
 } from "./completedRequestDetails";
 import { shouldPersistToDisk } from "./migrations";
 import { attemptWrite, isWriteLockError, scheduleWriteRetry } from "./usageWriteRetry";
+import { getCallLogApiKeyContext } from "./callLogApiKeyContext";
 
 export type PendingRequestMetadata = {
   clientEndpoint?: string | null;
@@ -858,23 +859,48 @@ export interface UsageEntry {
 }
 
 /**
+ * Controls the legacy natural-key guard for one usage write.
+ *
+ * Normal callers keep the default so repeated callbacks for one request remain
+ * one row. A writer that already owns a distinct physical-attempt boundary may
+ * explicitly disable that guard without changing the row, cache, event, or
+ * account-attribution paths below.
+ */
+export interface SaveRequestUsageOptions {
+  deduplicate?: boolean;
+}
+
+/**
  * Save request usage entry to SQLite.
  */
-export async function saveRequestUsage(entry: UsageEntry) {
+export async function saveRequestUsage(entry: UsageEntry, options: SaveRequestUsageOptions = {}) {
   if (!shouldPersistToDisk) return;
 
   // Freeze the timestamp on the first attempt so the deferred retry replays
   // the same value and the dedup guard keys both attempts identically.
-  const frozenEntry = { ...entry, timestamp: entry.timestamp || new Date().toISOString() };
+  // Fall back to the request-scoped api-key context, exactly as saveCallLogOperation
+  // does. The context exists so callers need not thread identity through every
+  // handler, but this writer only ever read `entry.apiKeyId` — so media paths, which
+  // set the context once in the route, stored an unattributed usage row while their
+  // call-log row came out attributed. Attribution matters here more than in call_logs:
+  // this table is what the per-key usage aggregation reads. Resolved before the write
+  // so a deferred retry (outside the request's async context) keeps the attribution.
+  const apiKeyContext = getCallLogApiKeyContext();
+  const frozenEntry = {
+    ...entry,
+    timestamp: entry.timestamp || new Date().toISOString(),
+    apiKeyId: entry.apiKeyId || apiKeyContext?.apiKeyId || null,
+    apiKeyName: entry.apiKeyName || apiKeyContext?.apiKeyName || null,
+  };
 
   try {
-    attemptWrite(frozenEntry);
+    attemptWrite(frozenEntry, options);
   } catch (error) {
     if (!isWriteLockError(error)) {
       console.error("Failed to save usage stats:", error);
       return;
     }
-    scheduleWriteRetry(frozenEntry);
+    scheduleWriteRetry(frozenEntry, options);
   }
 }
 

@@ -54,8 +54,11 @@ const {
 // pool member, default off) takes it to 82; USAGE_LIMIT_IGNORE_UNPRICED (#14799,
 // opt-in flag to count unpriced usage as $0 in USD quotas, default off) to 83;
 // REASONING_REPLAY_ENABLED (#12486, default on) to 84; COMBO_AUTO_PRUNE_STALE_STEPS
-// (#13505, default off) to 85.
-const EXPECTED_FEATURE_FLAG_COUNT = 85;
+// (#13505, default off) to 85; KIRO_TOOL_CALL_REPAIR_ENABLED (one-shot Kiro
+// tool_call wrapper repair, default on) to 86; CLAUDE_OAUTH_SUMMARIZED_THINKING_UNREDACTED
+// (#17003, lets Claude OAuth drop the redact-thinking beta for summarized thinking,
+// default off) to 87.
+const EXPECTED_FEATURE_FLAG_COUNT = 87;
 
 // ──────────────────────────────────────────────────────
 // Test group 1 — Flag definitions registry

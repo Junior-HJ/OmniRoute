@@ -12,6 +12,7 @@ import {
 import { maybeReactivateAfterExplicitProbe } from "../services/explicitInactiveProbe";
 import { connectionHasExtraKeys } from "@omniroute/open-sse/services/apiKeyRotator.ts";
 import { clearRequestRejectedStreak } from "@omniroute/open-sse/services/requestRejectedStreak.ts";
+import { clearAntigravityVerificationUrl } from "@omniroute/open-sse/handlers/chatCore/antigravityVerificationState.ts";
 import { createBuiltinAutoCombo } from "@omniroute/open-sse/services/autoCombo/builtinCatalog.ts";
 import * as log from "../utils/logger";
 import { updateProviderCredentials } from "../services/tokenRefresh";
@@ -61,6 +62,7 @@ import { logProxyJournal } from "./proxyJournal";
 import type { AttemptJournalEntry } from "./proxyJournal";
 import { logTranslationEvent } from "../../lib/translatorEvents";
 import { getRuntimeProviderProfile } from "@omniroute/open-sse/services/accountFallback.ts";
+import { describeConnectionRestriction } from "../services/credentialSelectionDiagnostics.ts";
 
 // #14960: circuit-open 503 that also names the breaker's classified failure kind.
 function breakerOpenResponse(provider: string, breaker: CircuitBreaker, retryAfterSec: number) {
@@ -451,6 +453,7 @@ export async function executeChatWithBreaker({
   videoBridgeLog = undefined,
   fallbackAttempts = undefined,
   forcedConnectionId = null,
+  allowedConnections = null,
   // optional resume flag from a rehydrated previous_response_id —
   // forwarded to handleChatCore, which notes it under the attempt store.
   previousResponseResumed = undefined,
@@ -528,6 +531,7 @@ export async function executeChatWithBreaker({
             previousResponseResumed,
             fallbackAttempts,
             forcedConnectionId,
+            allowedConnections,
             skipResourcePressureGuard: true,
             onCredentialsRefreshed: async (newCreds: any) => {
               await updateProviderCredentials(credentials.connectionId, {
@@ -548,6 +552,11 @@ export async function executeChatWithBreaker({
               // Only a real success ends the per-request refusal streak (#12859).
               if (credentials.connectionId) clearRequestRejectedStreak(credentials.connectionId);
               await clearAccountError(credentials.connectionId, credentials);
+              await clearAntigravityVerificationUrl(
+                provider,
+                credentials.connectionId,
+                credentials.providerSpecificData
+              );
               await maybeReactivateAfterExplicitProbe({
                 connectionId: credentials.connectionId,
                 reactivatedFromInactive: credentials.reactivatedFromInactive,
@@ -815,19 +824,11 @@ export function handleNoCredentials(
     return errorResponse(httpStatus, message);
   }
   if (credentials?.blockedByKeyPolicy) {
-    // #13832: the provider HAS active connections — they were filtered out by the
-    // gateway API key's connection allowlist (`allowed_connections`) or its quota
-    // scope, so the pool arrived empty and the generic "No active credentials"
-    // below was indistinguishable from "this provider was never configured". That
-    // cost the reporter a full investigation: their key passed `/test` and synced
-    // 82 models (both address the connection by id and never consult the key's
-    // scope), while chat kept failing. The classic shape is a key minted before
-    // the provider existed, which is why older providers keep working on it.
-    // 403, not 401: the credential is fine, this principal is not allowed to use it.
+    // #15889: the effective restriction is not necessarily an API-key policy.
     const count = credentials.blockedCount || 1;
     const message =
-      `[${provider}] ${count} connection(s) exist but are excluded by this API key's ` +
-      `connection allowlist / quota scope — add them to the key in the dashboard, or use a key without that scope`;
+      `[${provider}] ${count} connection(s) exist but are excluded by ` +
+      `${describeConnectionRestriction(credentials.connectionRestrictionSources)} — review the connection routing constraints in the dashboard`;
     log.warn("AUTH", message);
     return errorResponse(HTTP_STATUS.FORBIDDEN, message);
   }
