@@ -78,7 +78,7 @@ describe("feature-flags-settings count update", () => {
     // (#13505, default off) to 85; KIRO_TOOL_CALL_REPAIR_ENABLED (default on) to 86;
     // CLAUDE_OAUTH_SUMMARIZED_THINKING_UNREDACTED (#17003, default off) to 87.
     // NATIVE_CODEX_REACTIVE_COMPACTION_ENABLED (#16632, default off) to 88.
-    assert.equal(FEATURE_FLAG_DEFINITIONS.length, 88);
+    assert.equal(FEATURE_FLAG_DEFINITIONS.length, 91);
   });
 });
 
