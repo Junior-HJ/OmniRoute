@@ -1,4 +1,5 @@
 import { handleVideoGeneration } from "@omniroute/open-sse/handlers/videoGeneration.ts";
+import { getRequestedModelEndpointMismatch } from "@/lib/providerModels/modelEndpointGuard";
 import { runWithCallLogApiKeyContext } from "@/lib/usage/callLogApiKeyContext";
 import { resolveVideoCredentialProvider } from "@omniroute/open-sse/handlers/videoGeneration/googleFlow.ts";
 import { withInjectionGuard } from "@/middleware/promptInjectionGuard";
@@ -75,6 +76,9 @@ async function postHandler(request, context) {
   // the key's connection scope, the same scope chat applies.
   const scope = await resolveKeyConnectionScope(policy.apiKeyInfo);
   if (scope.rejection) return scope.rejection;
+  // Respect API key scope before rejecting incompatible model endpoints.
+  const endpointMismatch = await getRequestedModelEndpointMismatch(body.model, "videos");
+  if (endpointMismatch) return errorResponse(HTTP_STATUS.BAD_REQUEST, endpointMismatch);
   const { allowedConnections } = scope;
 
   // Bind API-key identity for every call log and usage row this request emits.

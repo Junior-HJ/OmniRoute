@@ -5,12 +5,13 @@
  * filesystem artifacts and are loaded only for explicit detail/export flows.
  */
 
-import fs from "node:fs";
-import path from "node:path";
 import type { RequestPipelinePayloads } from "@omniroute/open-sse/utils/requestLogger.ts";
 import { sanitizeErrorMessage } from "@omniroute/open-sse/utils/errorSanitization.ts";
 import { getDbInstance } from "../db/core";
-import { getRequestDetailLogByCallLogId } from "../db/detailedLogs";
+import { failPendingCallLogDetail, publishPendingCallLogDetail } from "../db/callLogDetails";
+import { applyNodePrefix, resolveProviderDisplay } from "./callLogDisplay";
+export { applyNodePrefix, resolveProviderDisplay } from "./callLogDisplay";
+import { dashboardDetailIo, resolveCallLogDetail } from "./callLogDetailResolver";
 import { shouldPersistToDisk } from "./migrations";
 import { updateRequestTokensById } from "./usageHistory";
 import { getCallLogApiKeyContext } from "./callLogApiKeyContext";
@@ -41,18 +42,12 @@ import {
   protectPayloadForLog,
 } from "../logPayloads";
 import { pickDisplayValue } from "@/shared/utils/maskEmail";
-import {
-  getCallLogsDir,
-  readCallArtifact,
-  type CallLogArtifact,
-  type CallLogDetailState,
-} from "./callLogArtifacts";
+import { getCallLogsDir, type CallLogArtifact, type CallLogDetailState } from "./callLogArtifacts";
 import { closeCallLogArtifactWriter, writeCallArtifactAsync } from "./callLogArtifactWriter";
 import { isWriteLockError, scheduleWriteRetry } from "./usageWriteRetry";
 import {
   toNumber,
   toStringOrNull,
-  parseInlineError,
   normalizeDetailState,
   sanitizeErrorForLog,
   toStoredErrorSummary,
@@ -141,12 +136,6 @@ type CallLogSummaryRow = {
 export const RESOLVED_ACCOUNT_SQL =
   "COALESCE(NULLIF(pc.name, ''), NULLIF(pc.email, ''), cl.account)";
 
-type LegacyInlineRow = {
-  request_body: string | null;
-  response_body: string | null;
-  error: string | null;
-};
-
 type DeleteResult = {
   deletedRows: number;
   deletedArtifacts: number;
@@ -220,17 +209,6 @@ function isCompatibleProviderId(providerId: string | null): boolean {
   );
 }
 
-export function applyNodePrefix(
-  requestedModel: string | null,
-  provider: string | null,
-  nodePrefix: string | null
-): string | null {
-  if (!requestedModel || !provider || !nodePrefix) return requestedModel;
-  if (requestedModel.startsWith(provider + "/")) {
-    return nodePrefix + "/" + requestedModel.slice(provider.length + 1);
-  }
-  return requestedModel;
-}
 function buildArtifact(
   logEntry: {
     id: string;
@@ -372,13 +350,6 @@ function resolveReasoningObservation(
   return { source: null, chars: null };
 }
 
-function hasTable(tableName: string): boolean {
-  const db = getDbInstance();
-  return Boolean(
-    db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName)
-  );
-}
-
 function hasCallLogsColumn(columnName: string): boolean {
   // One PRAGMA per INSERT is wasteful; the cached answer is invalidated only
   // when a write fails with "no such column" (concurrent migration race).
@@ -399,70 +370,6 @@ function hasCallLogsColumn(columnName: string): boolean {
 
 export function invalidateCallLogsColumnCache(): void {
   (hasCallLogsColumn as { cache?: Map<string, boolean> }).cache = undefined;
-}
-
-function readLegacyLogFromDisk(entry: {
-  timestamp: string | null;
-  model: string | null;
-  status: number;
-}) {
-  const logsDir = getCallLogsDir();
-  if (!logsDir || !entry.timestamp) return null;
-
-  try {
-    const date = new Date(entry.timestamp);
-    if (Number.isNaN(date.getTime())) return null;
-
-    const dateFolder = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(date.getDate()).padStart(2, "0")}`;
-    const dir = path.join(logsDir, dateFolder);
-    if (!fs.existsSync(dir)) return null;
-
-    const time = `${String(date.getHours()).padStart(2, "0")}${String(date.getMinutes()).padStart(
-      2,
-      "0"
-    )}${String(date.getSeconds()).padStart(2, "0")}`;
-    const safeModel = (entry.model || "unknown").replace(/[/:]/g, "-");
-    const expectedName = `${time}_${safeModel}_${entry.status}.json`;
-
-    const exactPath = path.join(dir, expectedName);
-    if (fs.existsSync(exactPath)) {
-      return JSON.parse(fs.readFileSync(exactPath, "utf8"));
-    }
-
-    const files = fs
-      .readdirSync(dir)
-      .filter((file) => file.startsWith(time) && file.endsWith(`_${entry.status}.json`));
-    if (files.length > 0) {
-      return JSON.parse(fs.readFileSync(path.join(dir, files[0]), "utf8"));
-    }
-  } catch (error) {
-    console.error(
-      "[callLogs] Failed to read legacy disk log:",
-      sanitizeErrorMessage(error) || "Legacy call log read failed"
-    );
-  }
-
-  return null;
-}
-
-export function resolveProviderDisplay(
-  provider: string | null,
-  nodeName: string | null,
-  nodePrefix: string | null
-): string | null {
-  const rawProvider = toStringOrNull(provider);
-  if (!rawProvider) return null;
-
-  const name = toStringOrNull(nodeName)?.trim();
-  if (name) return name;
-
-  const prefix = toStringOrNull(nodePrefix)?.trim();
-  if (prefix) return prefix;
-
-  return null;
 }
 
 export { parseResilienceActions };
@@ -525,34 +432,6 @@ function mapSummaryRow(row: CallLogSummaryRow) {
   };
 }
 
-function buildLegacyPipelinePayloads(id: string) {
-  const detailed = getRequestDetailLogByCallLogId(id);
-  if (!detailed) return null;
-
-  return {
-    clientRequest: detailed.client_request ?? null,
-    providerRequest: detailed.translated_request ?? null,
-    providerResponse: detailed.provider_response ?? null,
-    clientResponse: detailed.client_response ?? null,
-  };
-}
-
-function getLegacyInlineDetail(id: string) {
-  if (!hasTable("call_logs_v1_legacy")) return null;
-
-  const db = getDbInstance();
-  const row = db
-    .prepare("SELECT request_body, response_body, error FROM call_logs_v1_legacy WHERE id = ?")
-    .get(id) as LegacyInlineRow | undefined;
-  if (!row) return null;
-
-  return {
-    requestBody: parseStoredPayload(row.request_body),
-    responseBody: parseStoredPayload(row.response_body),
-    error: parseInlineError(row.error),
-  };
-}
-
 async function saveCallLogOperation(entry: any): Promise<void> {
   let prepared: PreparedCallLogRow;
   try {
@@ -561,20 +440,31 @@ async function saveCallLogOperation(entry: any): Promise<void> {
     logCallLogSaveFailure(error);
     return;
   }
+  let inserted = false;
   try {
     insertCallLogRow(prepared);
+    inserted = true;
   } catch (error) {
     if (!isWriteLockError(error)) {
       logCallLogSaveFailure(error);
       return;
     }
-    const retry = scheduleWriteRetry(() => insertCallLogRow(prepared), logCallLogSaveFailure);
+    const retry = scheduleWriteRetry(() => {
+      insertCallLogRow(prepared);
+      inserted = true;
+    }, logCallLogSaveFailure);
     pendingCallLogSaves.add(retry);
     try {
       await retry;
     } finally {
       pendingCallLogSaves.delete(retry);
     }
+  }
+  if (!inserted) return;
+  try {
+    await publishCallLogDetail(prepared);
+  } catch (error) {
+    logCallLogSaveFailure(error);
   }
 }
 
@@ -585,6 +475,8 @@ type PreparedCallLogRow = {
   hasResilienceColumn: boolean;
   detailState: CallLogDetailState;
   responseId: string | null;
+  /** Builds the artifact from the row's FINAL id; null when no detail is expected. */
+  buildDetailArtifact: (() => ReturnType<typeof buildArtifact>) | null;
 };
 
 function logCallLogSaveFailure(error: unknown): void {
@@ -801,37 +693,23 @@ async function buildCallLogRow(entry: any): Promise<PreparedCallLogRow> {
       protectedError !== null ||
       protectedPipelinePayloads !== null);
 
-  let detailState: CallLogDetailState = "none";
-  let artifactRelPath: string | null = null;
-  let artifactSizeBytes: number | null = null;
-  let artifactSha256: string | null = null;
-
-  if (detailExpected) {
-    const artifact = buildArtifact(
-      logEntry,
-      protectedRequestBody,
-      protectedResponseBody,
-      protectedError,
-      protectedPipelinePayloads
-    );
-    const artifactResult = await writeCallArtifactAsync(artifact);
-    if (artifactResult) {
-      detailState = "ready";
-      artifactRelPath = artifactResult.relPath;
-      artifactSizeBytes = artifactResult.sizeBytes;
-      artifactSha256 = artifactResult.sha256;
-    } else {
-      detailState = "missing";
-    }
-  }
+  // The row is inserted BEFORE its artifact is written: the artifact path is
+  // derived from (timestamp, id), so the id must be final — i.e. accepted by
+  // the UNIQUE primary key — before any file is published. Writing first and
+  // regenerating the id afterwards let a repeated explicit id + timestamp
+  // overwrite an earlier row's artifact. Pending is a durable export barrier;
+  // a failed or abandoned write becomes terminal missing instead.
+  const detailState: CallLogDetailState = detailExpected ? "pending" : "none";
+  const detailPendingUntil = detailExpected ? Date.now() + 5 * 60_000 : null;
 
   const insertParams = {
     ...logEntry,
     errorSummary: toStoredErrorSummary(protectedError),
     detailState,
-    artifactRelPath,
-    artifactSizeBytes,
-    artifactSha256,
+    detailPendingUntil,
+    artifactRelPath: null,
+    artifactSizeBytes: null,
+    artifactSha256: null,
     hasRequestBody: protectedRequestBody !== null ? 1 : 0,
     hasResponseBody: protectedResponseBody !== null ? 1 : 0,
     resilienceActions,
@@ -845,11 +723,21 @@ async function buildCallLogRow(entry: any): Promise<PreparedCallLogRow> {
     hasResilienceColumn,
     detailState,
     responseId: typeof logEntry.responseId === "string" ? logEntry.responseId : null,
+    buildDetailArtifact: detailExpected
+      ? () =>
+          buildArtifact(
+            logEntry,
+            protectedRequestBody,
+            protectedResponseBody,
+            protectedError,
+            protectedPipelinePayloads
+          )
+      : null,
   };
 }
 
 function insertCallLogRow(prepared: PreparedCallLogRow): void {
-  const { db, insertParams, hasResilienceColumn, detailState, responseId } = prepared;
+  const { db, logEntry, insertParams, hasResilienceColumn } = prepared;
   // Optional column (migration 191) — only fixed identifiers are spliced in.
   const resilienceCol = hasResilienceColumn ? ", resilience_actions" : "";
   const resilienceParam = hasResilienceColumn ? ", @resilienceActions" : "";
@@ -864,7 +752,7 @@ function insertCallLogRow(prepared: PreparedCallLogRow): void {
         reasoning_encrypted,
         cache_source, request_type, source_format, target_format, api_key_id, api_key_name,
         combo_name, combo_step_id, combo_execution_key, error_summary, detail_state,
-        artifact_relpath, artifact_size_bytes, artifact_sha256,
+        detail_pending_until, artifact_relpath, artifact_size_bytes, artifact_sha256,
         has_request_body, has_response_body, has_pipeline_details, request_summary,
         correlation_id, model_pinned, session_tag, response_id, error_type,
         video_content_removed, has_content, usage_provenance,
@@ -879,7 +767,7 @@ function insertCallLogRow(prepared: PreparedCallLogRow): void {
         @reasoningEncrypted,
         @cacheSource, @requestType, @sourceFormat, @targetFormat, @apiKeyId, @apiKeyName,
         @comboName, @comboStepId, @comboExecutionKey, @errorSummary, @detailState,
-        @artifactRelPath, @artifactSizeBytes, @artifactSha256,
+        @detailPendingUntil, @artifactRelPath, @artifactSizeBytes, @artifactSha256,
         @hasRequestBody, @hasResponseBody, @hasPipelineDetails, @requestSummary,
         @correlationId, @modelPinned, @sessionTag, @responseId, @errorType,
         @videoContentRemoved, @hasContent, @usageProvenance,
@@ -888,7 +776,7 @@ function insertCallLogRow(prepared: PreparedCallLogRow): void {
     `
   );
   // #14451: a 6-char dashboard traceId (or any reused explicit id) can collide.
-  // Keep the already-written artifact path; only the SQLite primary key is regenerated.
+  // Regenerate logEntry.id too, so the artifact summary and path use the final id.
   for (let attempt = 0; ; attempt++) {
     try {
       insertStmt.run(insertParams);
@@ -896,12 +784,31 @@ function insertCallLogRow(prepared: PreparedCallLogRow): void {
     } catch (error) {
       if (!isCallLogIdCollision(error) || attempt >= CALL_LOG_ID_RETRY_LIMIT) throw error;
       insertParams.id = generateLogId();
+      logEntry.id = insertParams.id;
     }
   }
   // sink note: the sink is the unique consumer — reset only after a successful
   // INSERT, so a failed write (or a second persistence of the same
   // attempt) keeps the summary instead of silently writing NULL.
   resetResilienceActions();
+}
+
+/** Write the inserted row's artifact and publish it, or make the row terminal missing. */
+async function publishCallLogDetail(prepared: PreparedCallLogRow): Promise<void> {
+  const { db, logEntry, buildDetailArtifact, responseId } = prepared;
+  let detailState = prepared.detailState;
+  if (buildDetailArtifact) {
+    const id = String(logEntry.id);
+    try {
+      const artifactResult = await writeCallArtifactAsync(buildDetailArtifact());
+      if (artifactResult && publishPendingCallLogDetail(db, id, artifactResult)) {
+        detailState = "ready";
+      }
+    } finally {
+      // A null result or a thrown write must not strand the export cursor.
+      failPendingCallLogDetail(db, id);
+    }
+  }
 
   if (detailState === "ready" && typeof responseId === "string") {
     // The durable row is now authoritative; drop the bridge entry instead
@@ -1099,77 +1006,13 @@ export async function getCallLogById(id: string) {
   if (!row) return null;
 
   const entry = mapSummaryRow(row);
-  let detailState = entry.detailState;
-  let artifactRelPath = entry.artifactRelPath;
-
-  if (artifactRelPath) {
-    const artifactResult = readCallArtifact(artifactRelPath);
-    if (artifactResult.state === "ready" && artifactResult.artifact) {
-      return {
-        ...entry,
-        detailState: "ready" as const,
-        requestBody: artifactResult.artifact.requestBody ?? null,
-        responseBody: artifactResult.artifact.responseBody ?? null,
-        error: artifactResult.artifact.error ?? entry.error,
-        pipelinePayloads: artifactResult.artifact.pipeline ?? buildLegacyPipelinePayloads(id),
-        hasPipelineDetails: Boolean(artifactResult.artifact.pipeline) || entry.hasPipelineDetails,
-        active: false,
-      };
-    }
-
-    detailState = artifactResult.state;
-    if (artifactResult.state === "missing") {
-      clearArtifactReference(artifactRelPath, "missing");
-      artifactRelPath = null;
-    } else {
-      db.prepare("UPDATE call_logs SET detail_state = ? WHERE id = ?").run("corrupt", id);
-    }
-  }
-
-  if (detailState === "legacy-inline") {
-    const legacyInline = getLegacyInlineDetail(id);
-    if (legacyInline) {
-      const legacyPipeline = buildLegacyPipelinePayloads(id);
-      return {
-        ...entry,
-        detailState,
-        artifactRelPath,
-        ...legacyInline,
-        pipelinePayloads: legacyPipeline,
-        hasPipelineDetails: Boolean(legacyPipeline) || entry.hasPipelineDetails,
-        active: false,
-      };
-    }
-  }
-
-  const legacyDisk = readLegacyLogFromDisk(entry);
-  if (legacyDisk) {
-    const legacyPipeline = buildLegacyPipelinePayloads(id);
-    return {
-      ...entry,
-      detailState,
-      artifactRelPath,
-      requestBody: legacyDisk.requestBody ?? null,
-      responseBody: legacyDisk.responseBody ?? null,
-      error: legacyDisk.error ?? entry.error,
-      pipelinePayloads: legacyPipeline,
-      hasPipelineDetails: Boolean(legacyPipeline) || entry.hasPipelineDetails,
-      active: false,
-    };
-  }
-
-  const legacyPipeline = buildLegacyPipelinePayloads(id);
-  return {
-    ...entry,
-    detailState,
-    artifactRelPath,
-    requestBody: null,
-    responseBody: null,
-    error: entry.error,
-    pipelinePayloads: legacyPipeline,
-    hasPipelineDetails: Boolean(legacyPipeline) || entry.hasPipelineDetails,
-    active: false,
-  };
+  return resolveCallLogDetail(db, entry, getCallLogsDir(), {
+    io: dashboardDetailIo,
+    onArtifactState(relativePath, state) {
+      if (state === "missing") clearArtifactReference(relativePath, "missing");
+      else db.prepare("UPDATE call_logs SET detail_state = ? WHERE id = ?").run("corrupt", id);
+    },
+  });
 }
 
 export async function exportCallLogsSince(since: string) {

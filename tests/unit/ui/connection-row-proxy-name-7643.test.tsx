@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
+  // ConnectionRow formats timestamps with the active locale since #16947.
+  useLocale: () => "en",
 }));
 
 import ConnectionRow, {
