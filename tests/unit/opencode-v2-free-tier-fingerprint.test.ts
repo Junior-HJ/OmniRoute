@@ -89,9 +89,11 @@ test("placeholder tools provide verbatim v2.0.26 CLI schemas for read and shell"
     type: string;
     properties: Record<string, { type: string }>;
     required: string[];
+    additionalProperties?: boolean;
   };
   assert.equal(readParams.type, "object");
   assert.deepEqual(readParams.required, ["path"]);
+  assert.equal(readParams.additionalProperties, false);
   assert.ok("path" in readParams.properties);
   assert.ok("offset" in readParams.properties);
   assert.ok("limit" in readParams.properties);
@@ -100,9 +102,11 @@ test("placeholder tools provide verbatim v2.0.26 CLI schemas for read and shell"
     type: string;
     properties: Record<string, { type: string }>;
     required: string[];
+    additionalProperties?: boolean;
   };
   assert.equal(shellParams.type, "object");
   assert.deepEqual(shellParams.required, ["command"]);
+  assert.equal(shellParams.additionalProperties, false);
   assert.ok("command" in shellParams.properties);
   assert.ok("workdir" in shellParams.properties);
   assert.ok("timeout" in shellParams.properties);

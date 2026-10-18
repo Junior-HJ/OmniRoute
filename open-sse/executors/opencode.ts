@@ -1331,6 +1331,14 @@ export class OpencodeExecutor extends BaseExecutor {
       ? this.resolveEffectiveKey(credentials) || credentials.accessToken
       : undefined;
 
+    // The free tier only answers streamed requests (measured 2026-09-17: a non-streamed
+    // body answers 403 FreeTierError), so a JSON client is served by streaming upstream and
+    // rebuilding the JSON body from the event stream — the path chatCore already takes for
+    // any buffered event-stream response. Announcing the stream here keeps that buffering an
+    // expected outcome rather than a warning.
+    const gatedScope =
+      Boolean(model) && isGatedFreeTierRequest(this._surface(), this.provider, model);
+
     if (key) {
       if (this._requestFormat === "claude" || this.usesZenApiKeyAuth()) {
         headers["x-api-key"] = key;
@@ -1344,14 +1352,6 @@ export class OpencodeExecutor extends BaseExecutor {
     if (this._requestFormat === "claude") {
       headers["anthropic-version"] = "2023-06-01";
     }
-
-    // The free tier only answers streamed requests (measured 2026-09-17: a non-streamed
-    // body answers 403 FreeTierError), so a JSON client is served by streaming upstream and
-    // rebuilding the JSON body from the event stream — the path chatCore already takes for
-    // any buffered event-stream response. Announcing the stream here keeps that buffering an
-    // expected outcome rather than a warning.
-    const gatedScope =
-      Boolean(model) && isGatedFreeTierRequest(this._surface(), this.provider, model);
     if (stream || gatedScope) {
       headers["Accept"] = "text/event-stream";
     }

@@ -20,6 +20,7 @@ export const FINGERPRINT_TOOL_DEFINITIONS = {
         },
       },
       required: ["path"],
+      additionalProperties: false,
     },
   },
   shell: {
@@ -47,6 +48,7 @@ export const FINGERPRINT_TOOL_DEFINITIONS = {
         },
       },
       required: ["command"],
+      additionalProperties: false,
     },
   },
 } as const;
