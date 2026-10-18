@@ -458,6 +458,23 @@ export function isOpencodePoolReselectEnabled(): boolean {
   }
 }
 
+/**
+ * OpenCode v2 client fingerprint (#16571). Opt-in: when off, every OpenCode request keeps
+ * the current identity headers and free-tier body byte for byte. Fail closed: an
+ * unreadable flag store keeps the pre-flag behavior (disabled).
+ */
+export function isOpencodeV2ClientFingerprintEnabled(): boolean {
+  try {
+    return isFeatureFlagEnabled("OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED");
+  } catch (error) {
+    console.error(
+      "[featureFlags] Failed to resolve OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED, defaulting to disabled:",
+      error instanceof Error ? error.message : error
+    );
+    return false;
+  }
+}
+
 export function isServerOwnedToolLoopEnabled(
   reader: (key: string) => boolean = isFeatureFlagEnabled
 ): boolean {

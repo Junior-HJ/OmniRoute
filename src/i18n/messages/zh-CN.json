@@ -1017,6 +1017,7 @@
   "featureFlagBatchAndFileAutoCleanupEnabledDescription": "允许自动清理任务删除早于 OMNIROUTE_BATCH_RETENTION_DAYS 的终态（已完成/失败/已取消/已过期）Batch API 作业及其逐行检查点，并清除超过各自 expires_at 的已上传文件的 BLOB 内容。默认关闭：在运维人员选择启用之前，所有现有安装都将继续像以前一样保留这些数据。无论是否启用，运维人员触发的 DELETE /api/v1/batches/delete-completed 路由均不受影响——它是一个独立且无条件执行的公共 API 契约。",
   "featureFlagXaiOauthLiveModelDiscoveryDescription": "对于 xai-oauth 连接，使用 OAuth 持有者令牌从 https://api.x.ai/v1/models 获取实时 xAI 模型目录，而不是使用固定不变的静态种子数据。默认关闭：xai-oauth 将继续原样提供静态种子数据。出现任何解析错误时，发现功能都会回退到种子数据。",
   "featureFlagDbHealthcheckStartupDeferredEnabledDescription": "在服务器开始接受请求后运行启动时数据库完整性/健康检查，而不是阻塞启动直至检查完成。默认关闭：启动过程会像此更改之前一样等待检查完成，因此损坏的数据库仍会在处理第一个请求之前被发现。",
+  "featureFlagOpencodeV2ClientFingerprintEnabledDescription": "在 OpenCode Zen/Go 请求中发送 OpenCode v2 CLI 客户端指纹：opencode/latest/<2.x>/cli User-Agent 和 x-opencode-client cli；在免费套餐请求中发送 v2 会话标头和 v2 CLI read/shell 工具架构，且不发送 tool_choice \"none\"。默认关闭：每个 OpenCode 请求均保持当前身份、标头和请求正文不变。",
   "sidebar": {
     "home": "首页",
     "dashboard": "仪表板",

@@ -361,6 +361,18 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     warningLevel: "caution",
   },
   {
+    key: "OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED",
+    label: "OpenCode v2 Client Fingerprint",
+    description:
+      'Send the OpenCode v2 CLI client fingerprint on OpenCode Zen/Go requests (#16571): User-Agent opencode/latest/<2.x>/cli and x-opencode-client cli, a client User-Agent kept only when it is a 2.x OpenCode client, and on gated free-tier requests no x-opencode-request, the session mirrored onto x-opencode-session-id/x-session-affinity/x-session-id, the v2 CLI read/shell schemas on injected placeholder tools and a tool_choice of "none" dropped. Off by default: every OpenCode request keeps the current identity, headers and body byte for byte.',
+    descriptionI18nKey: "featureFlagOpencodeV2ClientFingerprintEnabledDescription",
+    category: "network",
+    defaultValue: "false",
+    type: "boolean",
+    requiresRestart: false,
+    warningLevel: "caution",
+  },
+  {
     key: "MITM_DISABLE_TLS_VERIFY",
     label: "Disable TLS Verify (MITM)",
     description: "Disable TLS certificate verification for MITM proxy",
