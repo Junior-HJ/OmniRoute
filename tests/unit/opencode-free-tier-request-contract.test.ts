@@ -151,21 +151,8 @@ test("the placeholder carries the names it is given, one entry each", () => {
   });
   assert.deepEqual(tools[2].function.parameters, {
     type: "object",
-    properties: {
-      path: { type: "string", description: "File or directory to read" },
-      offset: {
-        type: "integer",
-        minimum: 0,
-        description: "The line or directory entry to start reading from (1-based)",
-      },
-      limit: {
-        type: "integer",
-        minimum: 0,
-        description:
-          "The maximum number of lines or directory entries to read (defaults to and capped at 2000)",
-      },
-    },
-    required: ["path"],
+    properties: { filePath: { type: "string" } },
+    required: ["filePath"],
   });
 });
 
@@ -300,16 +287,13 @@ test("an unknown body format only gets the streaming flag", () => {
 
 test("the user-agent contract accepts a versioned opencode client and rejects the rest", () => {
   assert.equal(satisfiesOpencodeUserAgentContract(DEFAULT_OPENCODE_USER_AGENT), true);
-  assert.equal(satisfiesOpencodeUserAgentContract("opencode/latest/2.0.26/cli"), true);
-  assert.equal(satisfiesOpencodeUserAgentContract("opencode/2.0.0"), true);
-  assert.equal(satisfiesOpencodeUserAgentContract("opencode/beta/2.0.26/cli"), true);
+  assert.equal(satisfiesOpencodeUserAgentContract("opencode/1.17.0"), true);
+  assert.equal(satisfiesOpencodeUserAgentContract("opencode/beta/1.18.31/cli"), true);
   assert.equal(
-    satisfiesOpencodeUserAgentContract("opencode/latest/2.0.26/cli ai-sdk/provider-utils/4.0.23"),
+    satisfiesOpencodeUserAgentContract("opencode/1.18.14 ai-sdk/provider-utils/4.0.23"),
     true
   );
-  assert.equal(satisfiesOpencodeUserAgentContract("opencode/1.18.31"), false);
-  assert.equal(satisfiesOpencodeUserAgentContract("opencode/1.17.0"), false);
-  assert.equal(satisfiesOpencodeUserAgentContract("opencode/beta/1.18.31/cli"), false);
+  // Measured: 1.16.0 answers 426 UpgradeRequired, so it does not satisfy the contract.
   assert.equal(satisfiesOpencodeUserAgentContract("opencode/1.16.0"), false);
   assert.equal(satisfiesOpencodeUserAgentContract("opencode-cli/1.0.0"), false);
   assert.equal(satisfiesOpencodeUserAgentContract("opencode"), false);

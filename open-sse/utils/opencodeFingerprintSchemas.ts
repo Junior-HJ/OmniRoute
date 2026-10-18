@@ -1,5 +1,15 @@
-// Verbatim CLI v2.0.26 tool schemas and definitions for OpenCode free tier fingerprint
-export const FINGERPRINT_TOOL_DEFINITIONS = {
+/**
+ * OpenCode v2 client fingerprint for the free-tier request contract (#16571, ported from
+ * 9router). Opt-in only: read when `OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED` is on, through
+ * `opencodeFreeTierContract.ts`; with the flag off the contract keeps its own minimal
+ * placeholder schemas and nothing here is used.
+ *
+ * The `read` and `shell` entries are the OpenCode CLI v2.0.26 tool declarations, verbatim,
+ * so an injected placeholder declares exactly what the v2 client declares.
+ */
+const V2_TOOL_DEFINITIONS: Readonly<
+  Record<string, { readonly description: string; readonly parameters: Record<string, unknown> }>
+> = {
   read: {
     description:
       "Read the contents of a file or directory. Supports text files, images, and PDFs. Images and PDFs are presented directly to the model. Each text line is prefixed by its 1-based line number as <line>: <content>. The prefix is for reference and is not part of the file content. Directory entries are returned one per line. Use offset and limit to read large files or directories in sections. Prefer one larger read over many small slices, and use grep to find specific content in large files.",
@@ -49,39 +59,28 @@ export const FINGERPRINT_TOOL_DEFINITIONS = {
       required: ["command"],
     },
   },
-} as const;
-
-export const DEFAULT_PLACEHOLDER_TOOL_NAMES = ["read", "shell"] as const;
-
-export function placeholderToolDescription(name: string): string {
-  return (
-    FINGERPRINT_TOOL_DEFINITIONS[name as keyof typeof FINGERPRINT_TOOL_DEFINITIONS]?.description ??
-    "Do not call this tool. It exists only for API compatibility and must never be invoked."
-  );
-}
-
-const PLACEHOLDER_TOOL_PARAMETERS = { type: "object", properties: {} } as const;
-
-const PLACEHOLDER_TOOL_PARAMETER_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
-  bash: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
-  glob: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
-  grep: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
-  read: FINGERPRINT_TOOL_DEFINITIONS.read.parameters,
-  shell: FINGERPRINT_TOOL_DEFINITIONS.shell.parameters,
 };
 
-export function placeholderToolParameters(name: string): Record<string, unknown> {
-  return PLACEHOLDER_TOOL_PARAMETER_SCHEMAS[name] ?? PLACEHOLDER_TOOL_PARAMETERS;
+/** The v2 CLI declaration for `name`, or `undefined` when v2 declares no such tool. */
+export function v2PlaceholderTool(
+  name: string
+): { readonly description: string; readonly parameters: Record<string, unknown> } | undefined {
+  return Object.hasOwn(V2_TOOL_DEFINITIONS, name) ? V2_TOOL_DEFINITIONS[name] : undefined;
 }
 
+/**
+ * Drop a `tool_choice` of "none" (string or `{type: "none"}`): the free tier accepts only
+ * "auto" (measured 2026-09-18: any other value is 400 invalid_request_error), so a caller's
+ * "none" would turn a servable request into a refusal. Any other value travels unchanged.
+ * Mutates and returns `record`.
+ */
 export function sanitizeToolChoice<T extends Record<string, unknown>>(record: T): T {
-  if (
-    record.tool_choice === "none" ||
-    (typeof record.tool_choice === "object" &&
-      record.tool_choice !== null &&
-      (record.tool_choice as { type?: unknown })?.type === "none")
-  ) {
-    delete record.tool_choice;
-  }
+  const choice = record.tool_choice;
+  const isNone =
+    choice === "none" ||
+    (typeof choice === "object" &&
+      choice !== null &&
+      (choice as { type?: unknown }).type === "none");
+  if (isNone) delete record.tool_choice;
   return record;
 }

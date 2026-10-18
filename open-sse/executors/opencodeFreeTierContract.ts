@@ -42,6 +42,7 @@ import {
   resolvePlaceholderNames,
 } from "./opencodeToolObservation.ts";
 import { isOpencodeFreeTierRefusal } from "./opencodeGeoBlock.ts";
+import { sanitizeToolChoice, v2PlaceholderTool } from "../utils/opencodeFingerprintSchemas.ts";
 import {
   forgetAttempt,
   planShape,
@@ -295,14 +296,43 @@ export function configuredPlaceholderToolNames(): string[] {
   }
   return kept;
 }
-import {
-  FINGERPRINT_TOOL_DEFINITIONS,
-  placeholderToolDescription,
-  placeholderToolParameters,
-  sanitizeToolChoice,
-} from "../utils/opencodeFingerprintSchemas.ts";
+const PLACEHOLDER_TOOL_DESCRIPTION =
+  "Do not call this tool. It exists only for API compatibility and must never be invoked.";
+const PLACEHOLDER_TOOL_PARAMETERS = { type: "object", properties: {} } as const;
 
-export { placeholderToolDescription, placeholderToolParameters };
+/**
+ * Minimal parameter schemas for injected placeholder tools, mirroring the OpenCode client's
+ * argument names. Since 2026-10-14 the free tier refuses a declared `read` or `bash` whose
+ * parameter object has no properties (measured on /inference/v1: `read` + `bash` with
+ * `properties: {}` is 403, the same pair with `{command}` on `bash` is 200, and a request
+ * with no property-bearing `read` is 403), while an empty schema on a name outside the
+ * quartet (`webfetch`, `_noop`) still passes.
+ */
+const PLACEHOLDER_TOOL_PARAMETER_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
+  bash: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+  glob: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
+  grep: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] },
+  read: { type: "object", properties: { filePath: { type: "string" } }, required: ["filePath"] },
+};
+
+/**
+ * Parameter schema for an injected placeholder tool named `name`. With the opt-in v2
+ * fingerprint (`OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED`, #16571) a name the v2 CLI declares
+ * (`read`, `shell`) carries that CLI's verbatim schema instead.
+ */
+export function placeholderToolParameters(
+  name: string,
+  v2Fingerprint = false
+): Record<string, unknown> {
+  const v2 = v2Fingerprint ? v2PlaceholderTool(name) : undefined;
+  return v2?.parameters ?? PLACEHOLDER_TOOL_PARAMETER_SCHEMAS[name] ?? PLACEHOLDER_TOOL_PARAMETERS;
+}
+
+/** Description for an injected placeholder tool; the v2 CLI's own text under the v2 flag. */
+export function placeholderToolDescription(name: string, v2Fingerprint = false): string {
+  const v2 = v2Fingerprint ? v2PlaceholderTool(name) : undefined;
+  return v2?.description ?? PLACEHOLDER_TOOL_DESCRIPTION;
+}
 
 /**
  * Bring a free-tier request up to the upstream contract, without overriding anything the
@@ -314,8 +344,9 @@ export { placeholderToolDescription, placeholderToolParameters };
  * the Responses surface takes the flat one. Neither carries a `tool_choice` — the upstream
  * rejects any value but "auto" (measured 2026-09-18: 400 invalid_request_error, `only
  * "auto" is supported for tool_choice`), so a `tool_choice` the caller did not send is
- * never added, and one the caller did send travels unchanged. Any other body format only
- * gets the streaming flag: injecting a tool shape blind would be a guess.
+ * never added, and one the caller did send travels unchanged (except, under the opt-in v2
+ * fingerprint, a "none" the upstream would refuse: see `sanitizeToolChoice`). Any other body
+ * format only gets the streaming flag: injecting a tool shape blind would be a guess.
  *
  * Which names go in is resolved by `resolvePlaceholderNames`, because the upstream does
  * inspect them.
@@ -323,12 +354,13 @@ export { placeholderToolDescription, placeholderToolParameters };
 export function applyFreeTierRequestContract<T>(
   body: T,
   requestFormat: string | null,
-  placeholderNames: readonly string[] = [PLACEHOLDER_TOOL_NAME]
+  placeholderNames: readonly string[] = [PLACEHOLDER_TOOL_NAME],
+  v2Fingerprint = false
 ): T {
   if (!body || typeof body !== "object" || Array.isArray(body)) return body;
   const record = body as Record<string, unknown>;
   const next: Record<string, unknown> = { ...record, stream: true };
-  sanitizeToolChoice(next);
+  if (v2Fingerprint) sanitizeToolChoice(next);
 
   const existingNames = new Set(clientToolNamesOf(next));
   const baseNames = placeholderNames.length > 0 ? placeholderNames : [PLACEHOLDER_TOOL_NAME];
@@ -344,8 +376,8 @@ export function applyFreeTierRequestContract<T>(
       ...namesToAdd.map((name) => ({
         type: "function",
         name,
-        description: placeholderToolDescription(name),
-        parameters: placeholderToolParameters(name),
+        description: placeholderToolDescription(name, v2Fingerprint),
+        parameters: placeholderToolParameters(name, v2Fingerprint),
       })),
     ];
     return next as T;
@@ -358,8 +390,8 @@ export function applyFreeTierRequestContract<T>(
         type: "function",
         function: {
           name,
-          description: placeholderToolDescription(name),
-          parameters: placeholderToolParameters(name),
+          description: placeholderToolDescription(name, v2Fingerprint),
+          parameters: placeholderToolParameters(name, v2Fingerprint),
         },
       })),
     ];
@@ -394,7 +426,8 @@ export function mergeClientToolsWithObserved<T>(
   provider: string,
   model: string,
   session: string | undefined,
-  configured: readonly string[]
+  configured: readonly string[],
+  v2Fingerprint = false
 ): T {
   if (!body || typeof body !== "object" || Array.isArray(body)) return body;
   const record = body as Record<string, unknown>;
@@ -411,8 +444,8 @@ export function mergeClientToolsWithObserved<T>(
       ...missing.map((name) => ({
         type: "function",
         name,
-        description: placeholderToolDescription(name),
-        parameters: placeholderToolParameters(name),
+        description: placeholderToolDescription(name, v2Fingerprint),
+        parameters: placeholderToolParameters(name, v2Fingerprint),
       })),
     ];
     return next as T;
@@ -424,8 +457,8 @@ export function mergeClientToolsWithObserved<T>(
         type: "function",
         function: {
           name,
-          description: placeholderToolDescription(name),
-          parameters: placeholderToolParameters(name),
+          description: placeholderToolDescription(name, v2Fingerprint),
+          parameters: placeholderToolParameters(name, v2Fingerprint),
         },
       })),
     ];
@@ -475,7 +508,8 @@ export function prepareFreeTierRequest<T>(
   provider: string,
   model: string,
   session?: string,
-  origin?: object
+  origin?: object,
+  v2Fingerprint = false
 ): { body: T; attempt: FreeTierContractAttempt | null } {
   const clientToolNames = clientToolNamesOf(body);
   if (!requiresFreeTierRequestContract(surface, provider, model)) {
@@ -508,25 +542,20 @@ export function prepareFreeTierRequest<T>(
       replayNote: (verdict) => noteFreeTierOutcome({ ...attempt, probe: false }, verdict),
     });
   }
-  if (chosen === "bare") {
-    const streamed = withStreaming(body);
-    if (streamed && typeof streamed === "object" && !Array.isArray(streamed)) {
-      sanitizeToolChoice(streamed as Record<string, unknown>);
-    }
-    return {
-      body: streamed,
-      attempt,
-    };
-  }
   return {
-    body: applyFreeTierRequestContract(body, requestFormat, names),
+    body:
+      chosen === "bare"
+        ? withStreaming(body, v2Fingerprint)
+        : applyFreeTierRequestContract(body, requestFormat, names, v2Fingerprint),
     attempt,
   };
 }
 
-function withStreaming<T>(body: T): T {
+function withStreaming<T>(body: T, v2Fingerprint = false): T {
   if (!body || typeof body !== "object" || Array.isArray(body)) return body;
-  return { ...(body as Record<string, unknown>), stream: true } as T;
+  const next: Record<string, unknown> = { ...(body as Record<string, unknown>), stream: true };
+  if (v2Fingerprint) sanitizeToolChoice(next);
+  return next as T;
 }
 
 /**

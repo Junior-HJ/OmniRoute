@@ -110,6 +110,7 @@ import {
   isOpencodeRateLimited429EarlyStopEnabled,
   isOpencodeParkAndResumeEnabled,
   isOpencodePoolReselectEnabled,
+  isOpencodeV2ClientFingerprintEnabled,
 } from "@/shared/utils/featureFlags";
 import { isEgressBucketedLockScope } from "../config/providerErrorRules.ts";
 import {
@@ -274,6 +275,7 @@ export class OpencodeExecutor extends BaseExecutor {
       clientSession: this._clientSession,
       borrowed: attempt?.borrowed,
       clientToolNames: attempt?.clientToolNames ?? [],
+      v2Fingerprint: isOpencodeV2ClientFingerprintEnabled(),
     };
   }
 
@@ -1337,8 +1339,6 @@ export class OpencodeExecutor extends BaseExecutor {
       } else {
         headers["Authorization"] = `Bearer ${key}`;
       }
-    } else if (gatedScope && this._requestFormat !== "claude") {
-      headers["Authorization"] = "Bearer public";
     }
 
     if (this._requestFormat === "claude") {
@@ -1361,9 +1361,12 @@ export class OpencodeExecutor extends BaseExecutor {
     // OPENCODE_SYNTHESIZE_CLI_HEADERS=false. Client-supplied headers always win;
     // User-Agent is replaced with the CLI UA unless the client already sends one that
     // looks like the OpenCode CLI. Default values match 9router's proven defaults.
+    // #16571: the OpenCode v2 client fingerprint is opt-in (default off: identity unchanged).
+    const v2Fingerprint = isOpencodeV2ClientFingerprintEnabled();
     const cliDefaults = resolveOpencodeCliDefaults(
       this.config?.id || this.provider || "opencode",
-      gatedScope
+      gatedScope,
+      v2Fingerprint
     );
 
     this._clientSession = clientSuppliedOpencodeSession(clientHeaders, body);
@@ -1374,6 +1377,7 @@ export class OpencodeExecutor extends BaseExecutor {
         keepAgentUserAgent: this._surface() === "go" && !gatedScope, // #15311
         sessionBody: projectOpencodeSessionBody(body),
         reencodeSession: gatedScope,
+        v2Fingerprint,
       });
     }
 
@@ -1474,7 +1478,8 @@ export class OpencodeExecutor extends BaseExecutor {
       this.provider,
       model,
       this._clientSession,
-      body
+      body,
+      isOpencodeV2ClientFingerprintEnabled()
     );
     modifiedBody = prepared.body;
     // OpenCode's upstream 400s a request when a single enum property carries
