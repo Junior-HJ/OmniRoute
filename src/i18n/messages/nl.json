@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Verbindingen herschikken op beschikbaarheid",
     "reorderByAvailabilityError": "Verbindingen herschikken op beschikbaarheid is mislukt",
     "distributeProxies": "Proxy's distribueren",
+    "clearAccountProxies": "Accountproxy's verwijderen",
+    "clearAccountProxyAssignments": "Toewijzingen verwijderen",
+    "clearAccountProxiesConfirm": "Afzonderlijke proxytoewijzingen verwijderen uit alle {count} accounts van deze provider, inclusief uitgeschakelde accounts? Opgeslagen proxy's en toewijzingen op provider- en globaal niveau blijven behouden. De accounts nemen daarna opnieuw de proxy-instellingen op provider- en globaal niveau over.",
+    "accountProxiesCleared": "Proxytoewijzingen voor accounts verwijderd.",
+    "clearAccountProxiesPartial": "Het resetten van {count} account(s) is niet volledig gelukt. De weergegeven toewijzingen zijn vernieuwd; je kunt het opnieuw proberen.",
+    "clearAccountProxiesError": "De accountproxy's konden niet worden gereset en hun status kon niet worden vernieuwd. Laad de pagina opnieuw en probeer het nogmaals.",
     "distributing": "Distribueren...",
     "selectedCount": "{count, plural, one {# geselecteerd} other {# geselecteerd}}",
     "accountsCount": "{count, plural, one {# account} other {# accounts}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Distributie...",
       "complete": "Voltooid",
-      "defaultLabel": "Proxies Verdelen"
+      "defaultLabel": "Proxies Verdelen",
+      "confirmMessage": "Opgeslagen proxy's toewijzen aan elk account in deze groep? Dit vervangt bestaande accounttoewijzingen en schakelt proxyroutering in, ook voor uitgeschakelde accounts.",
+      "confirmDistribute": "Proxy's verdelen",
+      "cancel": "Annuleren"
     }
   },
   "providerTest": {

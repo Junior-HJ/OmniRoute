@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Athordaigh naisc de réir infhaighteachta",
     "reorderByAvailabilityError": "Theip ar athordú na nasc de réir infhaighteachta",
     "distributeProxies": "Dáil Seachfhreastalaithe",
+    "clearAccountProxies": "Bain seachfhreastalaithe cuntais",
+    "clearAccountProxyAssignments": "Bain na sannacháin",
+    "clearAccountProxiesConfirm": "Bain na sannacháin aonair seachfhreastalaí ó gach ceann de na {count} cuntas de chuid an tsoláthraí seo, cuntais dhíchumasaithe san áireamh? Coinneofar seachfhreastalaithe sábháilte agus sannacháin soláthraí/dhomhanda. Gheobhaidh na cuntais socruithe seachfhreastalaí an tsoláthraí/na socruithe domhanda le hoidhreacht arís.",
+    "accountProxiesCleared": "Baineadh sannacháin seachfhreastalaí na gcuntas.",
+    "clearAccountProxiesPartial": "Níorbh fhéidir {count} cuntas a athshocrú go hiomlán. Athnuadh na sannacháin atá ar taispeáint; is féidir leat triail eile a bhaint as.",
+    "clearAccountProxiesError": "Níorbh fhéidir seachfhreastalaithe na gcuntas a athshocrú ná a stádas a athnuachan. Athlódáil agus bain triail eile as.",
     "distributing": "Ag dáileadh...",
     "selectedCount": "{count, plural, one {# roghnaithe} other {# roghnaithe}}",
     "accountsCount": "{count, plural, one {# cuntas} other {# cuntais}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Ag dáileadh...",
       "complete": "Críochnaithe",
-      "defaultLabel": "Dáil Seachfhreastalaithe"
+      "defaultLabel": "Dáil Seachfhreastalaithe",
+      "confirmMessage": "Sann na seachfhreastalaithe sábháilte do gach cuntas sa ghrúpa seo? Tiocfaidh sé seo in ionad na sannachán cuntais atá ann cheana agus cumasóidh sé ródú trí sheachfhreastalaí, fiú do chuntais dhíchumasaithe.",
+      "confirmDistribute": "Dáil seachfhreastalaithe",
+      "cancel": "Cealaigh"
     }
   },
   "providerTest": {

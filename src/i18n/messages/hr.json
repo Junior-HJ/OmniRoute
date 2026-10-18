@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Preuredi veze prema dostupnosti",
     "reorderByAvailabilityError": "Nije uspjelo preuređivanje veza prema dostupnosti",
     "distributeProxies": "Rasporedi proxyje",
+    "clearAccountProxies": "Ukloni proxy poslužitelje računa",
+    "clearAccountProxyAssignments": "Ukloni dodjele",
+    "clearAccountProxiesConfirm": "Ukloniti pojedinačne dodjele proxy poslužitelja sa svih računa ovog pružatelja ({count}), uključujući onemogućene račune? Spremljeni proxy poslužitelji te dodjele na razini pružatelja i globalnoj razini bit će sačuvani. Računi će ponovno naslijediti postavke proxy poslužitelja na razini pružatelja i globalnoj razini.",
+    "accountProxiesCleared": "Dodjele proxy poslužitelja računima uklonjene su.",
+    "clearAccountProxiesPartial": "Nije bilo moguće u potpunosti vratiti {count} računa na zadane postavke. Prikazane dodjele su osvježene; možete pokušati ponovno.",
+    "clearAccountProxiesError": "Nije bilo moguće vratiti proxy poslužitelje računa na zadane postavke niti osvježiti njihov status. Ponovno učitajte i pokušajte ponovno.",
     "distributing": "Raspoređivanje...",
     "selectedCount": "{count, plural, one {# odabrano} other {# odabrano}}",
     "accountsCount": "{count, plural, one {# račun} other {# računa}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Distribucija u tijeku...",
       "complete": "Završeno",
-      "defaultLabel": "Distribuiraj proxije"
+      "defaultLabel": "Distribuiraj proxije",
+      "confirmMessage": "Dodijeliti spremljene proxy poslužitelje svakom računu u ovoj grupi? Time će se zamijeniti postojeće dodjele računima i omogućiti usmjeravanje putem proxy poslužitelja, uključujući onemogućene račune.",
+      "confirmDistribute": "Raspodijeli proxy poslužitelje",
+      "cancel": "Odustani"
     }
   },
   "providerTest": {

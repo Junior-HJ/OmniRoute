@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Reordenar conexões por disponibilidade",
     "reorderByAvailabilityError": "Falha ao reordenar conexões por disponibilidade",
     "distributeProxies": "Distribuir proxies",
+    "clearAccountProxies": "Remover proxies das contas",
+    "clearAccountProxyAssignments": "Remover atribuições",
+    "clearAccountProxiesConfirm": "Remover as atribuições individuais de proxy de todas as {count} contas deste provedor, incluindo as contas desativadas? Os proxies salvos e as atribuições do provedor/globais serão preservados. As contas voltarão a herdar as configurações de proxy do provedor/globais.",
+    "accountProxiesCleared": "As atribuições de proxy das contas foram removidas.",
+    "clearAccountProxiesPartial": "Não foi possível redefinir completamente {count} conta(s). As atribuições exibidas foram atualizadas; você pode tentar novamente.",
+    "clearAccountProxiesError": "Não foi possível redefinir os proxies das contas nem atualizar o status deles. Recarregue a página e tente novamente.",
     "distributing": "Distribuindo...",
     "selectedCount": "{count, plural, one {# selecionada} other {# selecionadas}}",
     "accountsCount": "{count, plural, one {# conta} other {# contas}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Distribuindo...",
       "complete": "Completo",
-      "defaultLabel": "Distribuir Proxies"
+      "defaultLabel": "Distribuir Proxies",
+      "confirmMessage": "Atribuir proxies salvos a todas as contas deste grupo? Isso substituirá as atribuições existentes das contas e ativará o roteamento por proxy, inclusive para contas desativadas.",
+      "confirmDistribute": "Distribuir proxies",
+      "cancel": "Cancelar"
     }
   },
   "providerTest": {

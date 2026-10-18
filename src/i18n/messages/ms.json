@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Susun semula sambungan mengikut ketersediaan",
     "reorderByAvailabilityError": "Gagal menyusun semula sambungan mengikut ketersediaan",
     "distributeProxies": "Edarkan Proksi",
+    "clearAccountProxies": "Alih keluar proksi akaun",
+    "clearAccountProxyAssignments": "Alih keluar penetapan",
+    "clearAccountProxiesConfirm": "Alih keluar penetapan proksi individu daripada kesemua {count} akaun penyedia ini, termasuk akaun yang dinyahdayakan? Proksi yang disimpan serta penetapan penyedia/global akan dikekalkan. Akaun akan mewarisi tetapan proksi penyedia/global sekali lagi.",
+    "accountProxiesCleared": "Penetapan proksi akaun telah dialih keluar.",
+    "clearAccountProxiesPartial": "Tidak dapat menetapkan semula sepenuhnya {count} akaun. Penetapan yang dipaparkan telah dimuat semula; anda boleh mencuba lagi.",
+    "clearAccountProxiesError": "Tidak dapat menetapkan semula proksi akaun atau memuat semula statusnya. Sila muat semula halaman dan cuba lagi.",
     "distributing": "Mengedarkan...",
     "selectedCount": "{count, plural, one {# dipilih} other {# dipilih}}",
     "accountsCount": "{count, plural, one {# akaun} other {# akaun}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Mengagihkan...",
       "complete": "Lengkap",
-      "defaultLabel": "Sebarkan Proksi"
+      "defaultLabel": "Sebarkan Proksi",
+      "confirmMessage": "Tetapkan proksi yang disimpan kepada setiap akaun dalam kumpulan ini? Tindakan ini akan menggantikan penetapan akaun sedia ada dan mendayakan penghalaan proksi, termasuk untuk akaun yang dinyahdayakan.",
+      "confirmDistribute": "Agihkan proksi",
+      "cancel": "Batal"
     }
   },
   "providerTest": {

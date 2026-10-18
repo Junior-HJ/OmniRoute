@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Promijeni redoslijed konekcija prema dostupnosti",
     "reorderByAvailabilityError": "Neuspjelo promjenjivanje redoslijeda konekcija prema dostupnosti",
     "distributeProxies": "Distribuiraj proxije",
+    "clearAccountProxies": "Ukloni proxyje računa",
+    "clearAccountProxyAssignments": "Ukloni dodjele",
+    "clearAccountProxiesConfirm": "Ukloniti pojedinačne dodjele proxyja sa svih {count} računa ovog pružaoca usluga, uključujući onemogućene račune? Sačuvani proxyji i dodjele na nivou pružaoca usluga/globalnom nivou bit će sačuvani. Računi će ponovo naslijediti postavke proxyja pružaoca usluga/globalne postavke.",
+    "accountProxiesCleared": "Dodjele proxyja računima su uklonjene.",
+    "clearAccountProxiesPartial": "Nije bilo moguće u potpunosti resetovati {count} račun(a). Prikazane dodjele su osvježene; možete pokušati ponovo.",
+    "clearAccountProxiesError": "Nije bilo moguće resetovati proxyje računa niti osvježiti njihov status. Ponovo učitajte stranicu i pokušajte ponovo.",
     "distributing": "Distribuiranje.",
     "selectedCount": "{count, plural, one {# odabrano} other {# odabrano}}",
     "accountsCount": "{count, plural, one {# račun} other {# računa}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Distribuiranje...",
       "complete": "Završeno",
-      "defaultLabel": "Distribuiraj proxyje"
+      "defaultLabel": "Distribuiraj proxyje",
+      "confirmMessage": "Dodijeliti sačuvane proxyje svakom računu u ovoj grupi? Ovo zamjenjuje postojeće dodjele računima i omogućava usmjeravanje putem proxyja, uključujući i onemogućene račune.",
+      "confirmDistribute": "Distribuiraj proxyje",
+      "cancel": "Otkaži"
     }
   },
   "providerTest": {

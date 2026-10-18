@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Järjesta ühendused saadavuse järgi",
     "reorderByAvailabilityError": "Ühenduste järjestamine saadavuse järgi ebaõnnestus",
     "distributeProxies": "Jaota puhverserverid",
+    "clearAccountProxies": "Eemalda kontode puhverserverid",
+    "clearAccountProxyAssignments": "Eemalda määrangud",
+    "clearAccountProxiesConfirm": "Kas eemaldada selle teenusepakkuja kõigilt {count} kontolt individuaalsed puhverserveri määrangud, sealhulgas keelatud kontodelt? Salvestatud puhverserverid ning teenusepakkuja/globaalsed määrangud säilitatakse. Kontod pärivad taas teenusepakkuja/globaalsed puhverserveri sätted.",
+    "accountProxiesCleared": "Kontode puhverserveri määrangud on eemaldatud.",
+    "clearAccountProxiesPartial": "{count} konto(de) täielik lähtestamine nurjus. Kuvatud määranguid on värskendatud; võite uuesti proovida.",
+    "clearAccountProxiesError": "Kontode puhverserverite lähtestamine või nende oleku värskendamine nurjus. Laadige leht uuesti ja proovige veel kord.",
     "distributing": "Jaotamine...",
     "selectedCount": "{count, plural, one {# valitud} other {# valitud}}",
     "accountsCount": "{count, plural, one {# konto} other {# kontot}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Puhverserverite jaotamine...",
       "complete": "Valmis",
-      "defaultLabel": "Jaota puhverserverid"
+      "defaultLabel": "Jaota puhverserverid",
+      "confirmMessage": "Kas määrata salvestatud puhverserverid selle rühma igale kontole? See asendab olemasolevad kontode määrangud ja lubab puhverserveri kaudu marsruutimise, sealhulgas keelatud kontode puhul.",
+      "confirmDistribute": "Jaota puhverserverid",
+      "cancel": "Loobu"
     }
   },
   "providerTest": {

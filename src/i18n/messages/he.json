@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "סדר מחדש חיבורים לפי זמינות",
     "reorderByAvailabilityError": "סידור מחדש של החיבורים לפי זמינות נכשל",
     "distributeProxies": "הפץ פרוקסים",
+    "clearAccountProxies": "הסרת פרוקסי מחשבונות",
+    "clearAccountProxyAssignments": "הסרת שיוכים",
+    "clearAccountProxiesConfirm": "להסיר את שיוכי הפרוקסי הנפרדים מכל {count} החשבונות של ספק זה, כולל חשבונות מושבתים? פרוקסי שמורים ושיוכים ברמת הספק או ברמה הגלובלית יישמרו. החשבונות יירשו שוב את הגדרות הפרוקסי ברמת הספק או ברמה הגלובלית.",
+    "accountProxiesCleared": "שיוכי הפרוקסי לחשבונות הוסרו.",
+    "clearAccountProxiesPartial": "לא ניתן היה לאפס באופן מלא {count} חשבונות. השיוכים המוצגים רועננו; ניתן לנסות שוב.",
+    "clearAccountProxiesError": "לא ניתן היה לאפס את הפרוקסי של החשבונות או לרענן את הסטטוס שלהם. יש לטעון מחדש ולנסות שוב.",
     "distributing": "מפיץ...",
     "selectedCount": "{count, plural, one {# נבחר} other {# נבחרו}}",
     "accountsCount": "{count, plural, one {# חשבון} other {# חשבונות}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "מפיץ...",
       "complete": "מלא",
-      "defaultLabel": "הפץ פרוקסים"
+      "defaultLabel": "הפץ פרוקסים",
+      "confirmMessage": "להקצות פרוקסי שמורים לכל חשבון בקבוצה זו? פעולה זו מחליפה את השיוכים הקיימים ומפעילה ניתוב דרך פרוקסי, כולל עבור חשבונות מושבתים.",
+      "confirmDistribute": "הפצת פרוקסי",
+      "cancel": "ביטול"
     }
   },
   "providerTest": {

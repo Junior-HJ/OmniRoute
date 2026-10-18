@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Ordna om anslutningar efter tillgänglighet",
     "reorderByAvailabilityError": "Det gick inte att ordna om anslutningar efter tillgänglighet",
     "distributeProxies": "Distribuera proxyer",
+    "clearAccountProxies": "Ta bort kontoproxyservrar",
+    "clearAccountProxyAssignments": "Ta bort tilldelningar",
+    "clearAccountProxiesConfirm": "Ta bort enskilda proxytilldelningar från alla {count} konton hos den här leverantören, inklusive inaktiverade konton? Sparade proxyservrar och leverantörs-/globala tilldelningar bevaras. Kontona kommer återigen att ärva leverantörens/globala proxyinställningar.",
+    "accountProxiesCleared": "Kontonas proxytilldelningar har tagits bort.",
+    "clearAccountProxiesPartial": "Det gick inte att återställa {count} konto(n) helt. De visade tilldelningarna har uppdaterats. Du kan försöka igen.",
+    "clearAccountProxiesError": "Det gick inte att återställa kontonas proxyservrar eller uppdatera deras status. Läs in sidan igen och försök på nytt.",
     "distributing": "Distribuerar...",
     "selectedCount": "{count, plural, one {# vald} other {# valda}}",
     "accountsCount": "{count, plural, one {# konto} other {# konton}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Distribuerar...",
       "complete": "Fullständig",
-      "defaultLabel": "Distribuera Proxies"
+      "defaultLabel": "Distribuera Proxies",
+      "confirmMessage": "Tilldela sparade proxyservrar till alla konton i den här gruppen? Detta ersätter befintliga kontotilldelningar och aktiverar proxy-routing, även för inaktiverade konton.",
+      "confirmDistribute": "Distribuera proxyservrar",
+      "cancel": "Avbryt"
     }
   },
   "providerTest": {

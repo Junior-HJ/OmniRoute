@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Reordonează conexiunile după disponibilitate",
     "reorderByAvailabilityError": "Reordonarea conexiunilor după disponibilitate a eșuat",
     "distributeProxies": "Distribuie proxy-uri",
+    "clearAccountProxies": "Elimină proxy-urile conturilor",
+    "clearAccountProxyAssignments": "Elimină atribuirile",
+    "clearAccountProxiesConfirm": "Elimini atribuirile individuale de proxy de la toate cele {count} conturi ale acestui furnizor, inclusiv de la conturile dezactivate? Proxy-urile salvate și atribuirile la nivel de furnizor/global sunt păstrate. Conturile vor moșteni din nou setările proxy ale furnizorului/globale.",
+    "accountProxiesCleared": "Atribuirile proxy ale conturilor au fost eliminate.",
+    "clearAccountProxiesPartial": "Nu s-au putut reseta complet {count} cont(uri). Atribuirile afișate au fost actualizate; poți încerca din nou.",
+    "clearAccountProxiesError": "Nu s-au putut reseta proxy-urile conturilor sau actualiza starea acestora. Reîncarcă pagina și încearcă din nou.",
     "distributing": "Se distribuie...",
     "selectedCount": "{count, plural, one {# selectat} few {# selectate} other {# de selectate}}",
     "accountsCount": "{count, plural, one {# cont} few {# conturi} other {# de conturi}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Distribuind...",
       "complete": "Completat",
-      "defaultLabel": "Distribuie Proxii"
+      "defaultLabel": "Distribuie Proxii",
+      "confirmMessage": "Atribui proxy-urile salvate fiecărui cont din acest grup? Aceasta înlocuiește atribuirile existente și activează rutarea prin proxy, inclusiv pentru conturile dezactivate.",
+      "confirmDistribute": "Distribuie proxy-urile",
+      "cancel": "Anulează"
     }
   },
   "providerTest": {

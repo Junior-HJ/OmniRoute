@@ -5376,6 +5376,12 @@
     "reorderByAvailabilityTitle": "Järjestä yhteydet uudelleen saatavuuden mukaan",
     "reorderByAvailabilityError": "Yhteyksien uudelleenjärjestäminen saatavuuden mukaan epäonnistui",
     "distributeProxies": "Jaa välityspalvelimet",
+    "clearAccountProxies": "Poista tilien välityspalvelimet",
+    "clearAccountProxyAssignments": "Poista määritykset",
+    "clearAccountProxiesConfirm": "Poistetaanko yksittäiset välityspalvelinmääritykset kaikilta tämän palveluntarjoajan {count} tililtä, myös käytöstä poistetuilta tileiltä? Tallennetut välityspalvelimet ja palveluntarjoaja-/yleiset määritykset säilytetään. Tilit perivät jälleen palveluntarjoajan/yleiset välityspalvelinasetukset.",
+    "accountProxiesCleared": "Tilien välityspalvelinmääritykset poistettu.",
+    "clearAccountProxiesPartial": "Kaikkia {count} tiliä ei voitu palauttaa oletusasetuksiin. Näytetyt määritykset on päivitetty; voit yrittää uudelleen.",
+    "clearAccountProxiesError": "Tilien välityspalvelimia ei voitu palauttaa oletusasetuksiin eikä niiden tilaa päivittää. Lataa sivu uudelleen ja yritä uudelleen.",
     "distributing": "Jaetaan...",
     "selectedCount": "{count, plural, one {# valittu} other {# valittua}}",
     "accountsCount": "{count, plural, one {# tili} other {# tiliä}}",
@@ -14680,7 +14686,10 @@
     "distributeProxies": {
       "distributing": "Jakaminen...",
       "complete": "Valmis",
-      "defaultLabel": "Jaa Välityspalvelimet"
+      "defaultLabel": "Jaa Välityspalvelimet",
+      "confirmMessage": "Määritetäänkö tallennetut välityspalvelimet kaikille tämän ryhmän tileille? Tämä korvaa nykyiset tilikohtaiset määritykset ja ottaa välityspalvelinreitityksen käyttöön myös käytöstä poistetuilla tileillä.",
+      "confirmDistribute": "Jaa välityspalvelimet",
+      "cancel": "Peruuta"
     }
   },
   "providerTest": {
