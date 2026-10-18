@@ -30,6 +30,7 @@ const V2_TOOL_DEFINITIONS: Readonly<
         },
       },
       required: ["path"],
+      additionalProperties: false,
     },
   },
   shell: {
@@ -57,6 +58,7 @@ const V2_TOOL_DEFINITIONS: Readonly<
         },
       },
       required: ["command"],
+      additionalProperties: false,
     },
   },
 };

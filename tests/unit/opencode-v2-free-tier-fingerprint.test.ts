@@ -194,9 +194,12 @@ test("contract body: v1 placeholders and tool_choice by default, v2 schemas when
   const v2 = applyFreeTierRequestContract(body(), "openai", ["read", "shell"], true) as typeof v1;
   assert.equal("tool_choice" in v2, false);
   const read = v2.tools[0].function.parameters as { required: string[]; properties: object };
+  // #16998 (Junior-HJ): the v2 CLI schemas close the object like the real client does.
+  assert.equal((read as { additionalProperties?: boolean }).additionalProperties, false);
   assert.deepEqual(read.required, ["path"]);
   assert.deepEqual(Object.keys(read.properties), ["path", "offset", "limit"]);
   const shell = v2.tools[1].function.parameters as { required: string[]; properties: object };
+  assert.equal((shell as { additionalProperties?: boolean }).additionalProperties, false);
   assert.deepEqual(shell.required, ["command"]);
   assert.deepEqual(Object.keys(shell.properties), ["command", "workdir", "timeout", "background"]);
   assert.match(v2.tools[0].function.description, /^Read the contents of a file or directory\./);
