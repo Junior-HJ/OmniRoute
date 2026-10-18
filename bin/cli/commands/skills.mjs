@@ -162,15 +162,33 @@ export async function runSkillsExecutions(opts, cmd) {
   emit(data.items ?? data, globalOpts, executionSchema);
 }
 
+const skillsshSchema = [
+  { key: "id", header: "ID", width: 48 },
+  { key: "name", header: "Name", width: 32 },
+  { key: "source", header: "Source", width: 28 },
+  { key: "installs", header: "Installs", width: 10 },
+];
+
+/** ` <server message>` from a failed response, or "" when the body carries none. */
+async function errorDetail(res) {
+  try {
+    const body = await res.json();
+    if (typeof body?.error === "string") return ` ${body.error}`;
+  } catch {
+    // Non-JSON error body: the status code alone is enough.
+  }
+  return "";
+}
+
 export async function runSkillsshList(opts, cmd) {
   const globalOpts = cmd.optsWithGlobals();
   const res = await apiFetch("/api/skills/skillssh");
   if (!res.ok) {
-    process.stderr.write(`Error: ${res.status}\n`);
+    process.stderr.write(`Error: ${res.status}${await errorDetail(res)}\n`);
     process.exit(1);
   }
   const data = await res.json();
-  emit(data.items ?? data, globalOpts, skillSchema);
+  emit(data.skills ?? data.items ?? data, globalOpts, skillsshSchema);
 }
 
 const GITHUB_SEGMENT = /^[A-Za-z0-9_.-]+$/;
@@ -221,14 +239,7 @@ export async function runSkillsshInstall(url, opts, cmd) {
     },
   });
   if (!res.ok) {
-    let detail = "";
-    try {
-      const body = await res.json();
-      if (typeof body?.error === "string") detail = ` ${body.error}`;
-    } catch {
-      // Non-JSON error body: the status code alone is enough.
-    }
-    process.stderr.write(`Error: ${res.status}${detail}\n`);
+    process.stderr.write(`Error: ${res.status}${await errorDetail(res)}\n`);
     process.exit(1);
   }
   const data = await res.json();
