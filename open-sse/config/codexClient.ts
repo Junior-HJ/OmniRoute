@@ -181,10 +181,7 @@ export function clearCodexClientVersionCache(): void {
 
 export function getCodexClientVersion(): string {
   const override = getSafeEnvValue(CODEX_VERSION_OVERRIDE_ENV, SAFE_HEADER_TOKEN_PATTERN);
-  if (override) {
-    codexVersionSource = "override";
-    return override;
-  }
+  if (override) return override;
   // Discovery may cache a registry version, but never below the release pin.
   if (
     cachedCodexVersion &&

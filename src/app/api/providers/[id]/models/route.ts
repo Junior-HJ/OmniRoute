@@ -2113,6 +2113,7 @@ export async function GET(
             : liveModels;
         const catalog = reconcileCodexCatalog(enrichedLiveModels);
         await persistDiscoveredModels(provider, connectionId, catalog.activeModels);
+        const clientVersionSource = getCodexClientVersionSource();
         return buildResponse({
           provider,
           connectionId,
@@ -2123,11 +2124,11 @@ export async function GET(
             mode: codexDiscoveryMode,
             clientVersion: {
               version: getCodexClientVersion(),
-              source: getCodexClientVersionSource(),
-              ...(getCodexClientVersionSource() === "fallback"
+              source: clientVersionSource,
+              ...(clientVersionSource === "fallback"
                 ? {
                     degraded:
-                      "the version registry was unreachable, so models gated behind a newer client may be missing",
+                      "the last version refresh failed, so models gated behind a newer client may be missing",
                   }
                 : {}),
             },

@@ -78,6 +78,19 @@ test("an env override reports the override source without touching the network",
   assert.equal(codexClient.getCodexClientVersionSource(), "override");
 });
 
+test("removing the override stops reporting the override source", () => {
+  process.env.CODEX_CLIENT_VERSION = "0.149.0";
+  assert.equal(codexClient.getCodexClientVersion(), "0.149.0");
+  assert.equal(codexClient.getCodexClientVersionSource(), "override");
+
+  delete process.env.CODEX_CLIENT_VERSION;
+
+  // Reading the version must not latch the source: with the override gone the
+  // answer has to fall back to the real cache state, not a stale "override".
+  assert.equal(codexClient.getCodexClientVersion(), codexClient.DEFAULT_CODEX_CLIENT_VERSION);
+  assert.equal(codexClient.getCodexClientVersionSource(), "fallback");
+});
+
 test("a non-ok response is reported too, not only a thrown error", async () => {
   const warnings: string[] = [];
   test.mock.method(console, "warn", (...args: unknown[]) => {
