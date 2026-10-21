@@ -68,7 +68,10 @@ test("codebuddy executors normalize tool schemas and invalid tool names (fixes T
     const transformed = exec.transformRequest("glm-5.2", input, false, {}) as RequestBody;
 
     // 1. Tool name sanitized to valid identifier
-    const toolFn = (transformed.tools?.[0] as Record<string, unknown>).function as Record<string, unknown>;
+    const toolFn = (transformed.tools?.[0] as Record<string, unknown>).function as Record<
+      string,
+      unknown
+    >;
     assert.equal(toolFn.name, "mcp_file_read", `${id}: tool name should be sanitized`);
 
     // 2. Correlated across assistant tool_calls and tool messages
@@ -76,7 +79,12 @@ test("codebuddy executors normalize tool schemas and invalid tool names (fixes T
     const assistantMsg = msgs.find((m) => m.role === "assistant" && Array.isArray(m.tool_calls));
     assert.ok(assistantMsg, `${id}: assistant message with tool_calls must exist`);
     assert.equal(
-      ((assistantMsg.tool_calls as Array<Record<string, unknown>>)[0].function as Record<string, unknown>).name,
+      (
+        (assistantMsg.tool_calls as Array<Record<string, unknown>>)[0].function as Record<
+          string,
+          unknown
+        >
+      ).name,
       "mcp_file_read"
     );
 
@@ -149,7 +157,11 @@ test("codebuddy executors normalize role developer and max_completion_tokens (fi
     const transformed = exec.transformRequest("glm-5.2", input, false, {}) as RequestBody;
 
     assert.equal(transformed.stream, true, `${id}: forces stream: true`);
-    assert.equal(transformed.max_completion_tokens, undefined, `${id}: removes max_completion_tokens`);
+    assert.equal(
+      transformed.max_completion_tokens,
+      undefined,
+      `${id}: removes max_completion_tokens`
+    );
     assert.equal(transformed.max_tokens, 4096, `${id}: maps to max_tokens`);
 
     const devMsg = transformed.messages?.find((m) => m.content === "system instructions");
