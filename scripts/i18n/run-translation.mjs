@@ -80,7 +80,9 @@ import { adoptState, mergeAdoptedState, refreshTargetHashes } from "./lib/transl
 // warning) in environments where node_modules has not been installed. The
 // formatter is applied to every translated file before its hash is recorded,
 // so a subsequent lint-staged Prettier pass cannot mutate the file content
-// out from under `.i18n-state.json`.
+// out from under `.i18n-state.json`. That only holds with the options the
+// `prettier --write` CLI resolves for the same path (prettier.config.mjs +
+// .editorconfig); Prettier's defaults wrap at 80 columns instead of 100.
 let prettierMod = null;
 async function getPrettier() {
   if (prettierMod !== null) return prettierMod;
@@ -92,11 +94,12 @@ async function getPrettier() {
   return prettierMod;
 }
 
-async function formatMarkdown(content, fileName) {
+export async function formatMarkdown(content, fileName) {
   const p = await getPrettier();
   if (!p) return content;
   try {
-    return await p.format(content, { parser: "markdown", filepath: fileName });
+    const config = (await p.resolveConfig(fileName, { editorconfig: true })) ?? {};
+    return await p.format(content, { ...config, parser: "markdown", filepath: fileName });
   } catch (err) {
     logWarn(`prettier could not format ${fileName}: ${err.message}`);
     return content;
@@ -403,6 +406,7 @@ const SYSTEM_PROMPT = (englishName, native) =>
     `Preserve all markdown syntax EXACTLY: headings, lists, code blocks (\`\`\`), inline code (\`...\`), links, images, tables, blockquotes, HTML tags.`,
     `Do NOT translate: source code, URLs, file paths, command names (npm/git/curl/node/etc), environment variable names (UPPER_SNAKE_CASE),`,
     `version numbers, package names, shell flags, function/class identifiers, JSON keys.`,
+    `Never change the text between backticks (inline code), even when it reads like prose: it is a literal the reader searches for (an error message, a label, a value).`,
     `Translate ALL prose, including comments inside code blocks IF they are clearly prose comments (lines starting with # or //).`,
     `Return ONLY the translated markdown — no preamble, no explanation, no surrounding fences.`,
   ].join(" ");
@@ -502,7 +506,46 @@ export function validateTranslatedChunk(source, output) {
   if (rows[0] !== rows[1]) problems.push(`table rows ${rows[1]}/${rows[0]}`);
   const meta = META_PROSE.filter((re) => countMatches(re, text) > countMatches(re, source));
   if (meta.length) problems.push(`meta-prose ${meta.map((re) => re.source).join(", ")}`);
+  const lost = lostInlineCode(source, text);
+  if (lost.length) {
+    const shown = lost.slice(0, 3).map((span) => `\`${span}\``);
+    problems.push(
+      `inline code changed: ${shown.join(", ")}${lost.length > 3 ? ` (+${lost.length - 3})` : ""}`
+    );
+  }
   return { text, problems };
+}
+
+// Inline code spans outside fenced blocks, counted by content. Soft-wrapped lines of a paragraph
+// are joined first, because a CommonMark code span may cross a line break.
+function inlineCodeSpans(markdown) {
+  const prose = [];
+  let inFence = false;
+  for (const line of markdown.split("\n")) {
+    if (FENCE_LINE.test(line)) {
+      inFence = !inFence;
+      prose.push("");
+    } else prose.push(inFence ? "" : line);
+  }
+  const joined = prose.join("\n").replace(/([^\n])\n(?=[^\n])/g, "$1 ");
+  const spans = new Map();
+  for (const match of joined.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)) {
+    const span = match[1].replace(/\s+/g, " ").trim();
+    if (span) spans.set(span, (spans.get(span) ?? 0) + 1);
+  }
+  return spans;
+}
+
+// Inline code is a literal: an error message, a flag, a marker the reader greps for. Every span of
+// the source must survive the translation at least as often — a translated span, or a dropped
+// backtick that re-pairs the rest of the line, shows up as a lost span. Spans the translator
+// adds (backticks around a product name) are not a loss.
+export function lostInlineCode(source, translated) {
+  const before = inlineCodeSpans(source);
+  const after = inlineCodeSpans(translated);
+  return [...before]
+    .filter(([span, count]) => (after.get(span) ?? 0) < count)
+    .map(([span]) => span);
 }
 
 const CHUNK_ATTEMPTS = 3;
