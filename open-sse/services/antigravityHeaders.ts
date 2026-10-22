@@ -99,13 +99,17 @@ export function resolveAntigravityGoPlatform(
 const ANTIGRAVITY_KNOWN_CHANGELISTS: Record<string, string> = {
   "1.4.4": "1003595037",
 };
-export const ANTIGRAVITY_CLI_FALLBACK_CHANGELIST = "1003595037";
 
-/** Resolve the CLI build changelist: explicit override, then the known-version table. */
-export function resolveAntigravityCliChangelist(version: string): string {
+/**
+ * Resolve the CLI build changelist: explicit override, then the known-version table.
+ * Returns `null` when the version has no recorded changelist, so the caller omits `cl=`
+ * entirely — a stale changelist paired with a newer version is a worse fingerprint than
+ * no changelist at all.
+ */
+export function resolveAntigravityCliChangelist(version: string): string | null {
   const override = process.env.ANTIGRAVITY_CLI_CL?.trim();
   if (override) return override;
-  return ANTIGRAVITY_KNOWN_CHANGELISTS[version] ?? ANTIGRAVITY_CLI_FALLBACK_CHANGELIST;
+  return ANTIGRAVITY_KNOWN_CHANGELISTS[version] ?? null;
 }
 
 function withOptionalBearerAuth(
@@ -128,7 +132,8 @@ export function antigravityCliUserAgent(
   changelist = resolveAntigravityCliChangelist(version),
   platform = resolveAntigravityGoPlatform()
 ): string {
-  return `antigravity/cli/${version} (aidev_client; os_type=${platform.osType}; arch=${platform.arch}; cl=${changelist}; auth_method=${authMethod})`;
+  const clToken = changelist ? `cl=${changelist}; ` : "";
+  return `antigravity/cli/${version} (aidev_client; os_type=${platform.osType}; arch=${platform.arch}; ${clToken}auth_method=${authMethod})`;
 }
 
 export function antigravityIdeNodeUserAgent(version = getCachedAntigravityIdeVersion()): string {

@@ -9,6 +9,7 @@ import {
   getAntigravityIdeNodeHeaders,
   getAntigravityLoadCodeAssistMetadata,
   getAntigravityOAuthUserAgent,
+  resolveAntigravityCliChangelist,
 } from "../../open-sse/services/antigravityHeaders.ts";
 import {
   clearAntigravityVersionCaches,
@@ -29,12 +30,24 @@ test("official IDE, IDE Node, and CLI User-Agent grammars match the native clien
   // The CLI is a Go binary: it reports the real host in GOOS/GOARCH dialect plus the
   // build changelist, both captured live from `agy 1.4.4` on Windows x64.
   assert.equal(
-    antigravityCliUserAgent("1.1.1", "consumer", "1003595037", {
+    antigravityCliUserAgent("1.4.4", "consumer", "1003595037", {
       osType: "windows",
       arch: "amd64",
     }),
-    "antigravity/cli/1.1.1 (aidev_client; os_type=windows; arch=amd64; cl=1003595037; auth_method=consumer)"
+    "antigravity/cli/1.4.4 (aidev_client; os_type=windows; arch=amd64; cl=1003595037; auth_method=consumer)"
   );
+});
+
+test("CLI User-Agent omits cl= instead of borrowing another version's changelist", () => {
+  // `cl` is a per-build Piper changelist. Replaying 1.4.4's value on 1.4.5 would advertise
+  // a build that does not exist, so an unknown version drops the token entirely.
+  assert.equal(
+    antigravityCliUserAgent("1.4.5", "consumer", undefined, { osType: "windows", arch: "amd64" }),
+    "antigravity/cli/1.4.5 (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)"
+  );
+  // A known version still resolves its changelist from the table.
+  assert.equal(resolveAntigravityCliChangelist("1.4.4"), "1003595037");
+  assert.equal(resolveAntigravityCliChangelist("1.4.5"), null);
 });
 
 test("User-Agent OS/arch token stays pinned to darwin/arm64 on the IDE path only", () => {
@@ -46,8 +59,8 @@ test("User-Agent OS/arch token stays pinned to darwin/arm64 on the IDE path only
   // The CLI profile is host-derived instead (Go binary), so pin the inputs here to keep
   // the assertion deterministic.
   assert.equal(
-    antigravityCliUserAgent("1.1.1", "oauth", "1003595037", { osType: "windows", arch: "amd64" }),
-    "antigravity/cli/1.1.1 (aidev_client; os_type=windows; arch=amd64; cl=1003595037; auth_method=oauth)"
+    antigravityCliUserAgent("1.4.4", "oauth", "1003595037", { osType: "windows", arch: "amd64" }),
+    "antigravity/cli/1.4.4 (aidev_client; os_type=windows; arch=amd64; cl=1003595037; auth_method=oauth)"
   );
 });
 
