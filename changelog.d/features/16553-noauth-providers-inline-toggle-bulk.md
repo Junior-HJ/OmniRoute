@@ -1,0 +1,1 @@
+- **feat(dashboard):** no-auth provider cards get a working inline enable/disable toggle (writes `blockedProviders`, alias and canonical ids kept in sync) plus Disable All / Enable All buttons in the No Auth section (#16553 - thanks @Junior-HJ)

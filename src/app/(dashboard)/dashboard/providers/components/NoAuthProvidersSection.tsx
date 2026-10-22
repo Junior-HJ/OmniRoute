@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { ProviderCardGrid } from "@/shared/components";
 import { computeNextBlockedProviders } from "@/shared/utils/noAuthProviders";
 import type { ProviderEntry } from "../providerPageUtils";
 import ProviderCard from "./ProviderCard";
@@ -140,7 +141,7 @@ export default function NoAuthProvidersSection({
         )}
       </div>
       <p className="text-sm text-text-muted -mt-2">{t("noAuthProvidersDesc")}</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
+      <ProviderCardGrid>
         {visibleEntries.map(({ providerId, provider, stats }) => (
           <ProviderCard
             key={providerId}
@@ -151,13 +152,13 @@ export default function NoAuthProvidersSection({
             onToggle={(active) => updateBlocked(providerId, active)}
           />
         ))}
-      </div>
+      </ProviderCardGrid>
       {blockedEntries.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
             {t("disabled")}
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
+          <ProviderCardGrid>
             {blockedEntries.map(({ providerId, provider }) => (
               <div
                 key={providerId}
@@ -182,7 +183,7 @@ export default function NoAuthProvidersSection({
                 </button>
               </div>
             ))}
-          </div>
+          </ProviderCardGrid>
         </div>
       )}
     </div>

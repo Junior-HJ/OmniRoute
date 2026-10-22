@@ -19,6 +19,7 @@ import { getProviderDisplayLabel } from "@/shared/utils/providerDisplayLabel";
 import { useIsElectron, useOpenExternal } from "@/shared/hooks/useElectron";
 import { HomeProviderTopologySection } from "./HomeProviderTopologySection";
 import { shouldShowProviderTopologyOnHome } from "./homeAppearance";
+import ManualUpdateCommand from "./ManualUpdateCommand";
 import HomeRecentRequests from "../home/HomeRecentRequests";
 
 type UpdateStep = {
@@ -34,6 +35,7 @@ type VersionInfo = {
   channel: string;
   autoUpdateSupported: boolean;
   autoUpdateError?: string | null;
+  manualUpdateCommand?: string | null;
 };
 
 type HomePageClientProps = {
@@ -156,27 +158,27 @@ export default function HomePageClient({ machineId }: HomePageClientProps) {
     if (platform === "darwin") {
       return {
         label: t("downloadDmg"),
-        url: `https://github.com/diegosouzapw/OmniRoute/releases/download/v${cleanLatest}/OmniRoute-${cleanLatest}.dmg`,
+        url: `https://github.com/cheaper-inference/OmniRoute/releases/download/v${cleanLatest}/OmniRoute-${cleanLatest}.dmg`,
         desc: t("downloadDmgDescription", { version: installedVersion }),
       };
     }
     if (platform === "win32") {
       return {
         label: t("downloadExe"),
-        url: `https://github.com/diegosouzapw/OmniRoute/releases/download/v${cleanLatest}/OmniRoute.Setup.${cleanLatest}.exe`,
+        url: `https://github.com/cheaper-inference/OmniRoute/releases/download/v${cleanLatest}/OmniRoute.Setup.${cleanLatest}.exe`,
         desc: t("downloadExeDescription", { version: installedVersion }),
       };
     }
     if (platform === "linux") {
       return {
         label: t("downloadAppImage"),
-        url: `https://github.com/diegosouzapw/OmniRoute/releases/download/v${cleanLatest}/OmniRoute-${cleanLatest}.AppImage`,
+        url: `https://github.com/cheaper-inference/OmniRoute/releases/download/v${cleanLatest}/OmniRoute-${cleanLatest}.AppImage`,
         desc: t("downloadAppImageDescription", { version: installedVersion }),
       };
     }
     return {
       label: t("downloadUpdate"),
-      url: `https://github.com/diegosouzapw/OmniRoute/releases/tag/v${cleanLatest}`,
+      url: `https://github.com/cheaper-inference/OmniRoute/releases/tag/v${cleanLatest}`,
       desc: t("downloadUpdateDescription", { version: installedVersion }),
     };
   }, [platform, t, latestVersion, installedVersion]);
@@ -569,7 +571,8 @@ export default function HomePageClient({ machineId }: HomePageClientProps) {
 
       setUpdateSteps(initialSteps);
 
-      const maxAttempts = channel === "docker-compose" ? 72 : 36;
+      // Docker rebuilds and host-side image pulls (docker-trigger) take longer than npm.
+      const maxAttempts = channel.startsWith("docker") ? 72 : 36;
 
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         await wait(5000);
@@ -947,6 +950,11 @@ export default function HomePageClient({ machineId }: HomePageClientProps) {
                       versionInfo.autoUpdateError || t("manualUpdateRequired")
                     )}
                   </p>
+                  {!isElectron &&
+                    !versionInfo.autoUpdateSupported &&
+                    versionInfo.manualUpdateCommand && (
+                      <ManualUpdateCommand command={versionInfo.manualUpdateCommand} />
+                    )}
                 </div>
               </div>
 
@@ -1024,7 +1032,7 @@ export default function HomePageClient({ machineId }: HomePageClientProps) {
                       variant="secondary"
                       onClick={() =>
                         openExternal(
-                          `https://github.com/diegosouzapw/OmniRoute/releases/tag/v${versionInfo.latest}`
+                          `https://github.com/cheaper-inference/OmniRoute/releases/tag/v${versionInfo.latest}`
                         )
                       }
                       className="font-semibold text-xs py-1"

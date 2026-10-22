@@ -35,10 +35,10 @@ describe("NoAuth Providers — inline toggle & bulk disable/enable", () => {
     act(() => {
       root.render(
         <ProviderCard
-          providerId="opencode"
+          providerId="devin-cli-agentic"
           provider={{
-            id: "opencode",
-            name: "OpenCode",
+            id: "devin-cli-agentic",
+            name: "Devin CLI Agentic",
             serviceKinds: [],
           }}
           stats={{ total: 0, connected: 0, error: 0, warning: 0 }}
@@ -82,7 +82,7 @@ describe("NoAuth Providers — inline toggle & bulk disable/enable", () => {
 
   it("NoAuthProvidersSection bulk disables all visible providers", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ blockedProviders: ["opencode"] }), {
+      new Response(JSON.stringify({ blockedProviders: ["devin-cli-agentic"] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       })
@@ -98,8 +98,8 @@ describe("NoAuth Providers — inline toggle & bulk disable/enable", () => {
         <NoAuthProvidersSection
           visibleEntries={[
             {
-              providerId: "opencode",
-              provider: { name: "OpenCode", alias: "oc" },
+              providerId: "devin-cli-agentic",
+              provider: { name: "Devin CLI Agentic", alias: "dva" },
               stats: { total: 0 },
               toggleAuthType: "no-auth",
             } as any,
@@ -128,10 +128,10 @@ describe("NoAuth Providers — inline toggle & bulk disable/enable", () => {
       "/api/settings",
       expect.objectContaining({
         method: "PATCH",
-        body: JSON.stringify({ blockedProviders: ["opencode"] }),
+        body: JSON.stringify({ blockedProviders: ["devin-cli-agentic"] }),
       })
     );
-    expect(onBlockedChange).toHaveBeenCalledWith(["opencode"]);
+    expect(onBlockedChange).toHaveBeenCalledWith(["devin-cli-agentic"]);
   });
 
   it("NoAuthProvidersSection bulk enables all blocked providers", async () => {
@@ -154,13 +154,13 @@ describe("NoAuth Providers — inline toggle & bulk disable/enable", () => {
           count={{ configured: 0, total: 1 }}
           blockedEntries={[
             {
-              providerId: "opencode",
-              provider: { name: "OpenCode", alias: "oc" },
+              providerId: "devin-cli-agentic",
+              provider: { name: "Devin CLI Agentic", alias: "dva" },
               stats: { total: 0 },
               toggleAuthType: "no-auth",
             } as any,
           ]}
-          blockedProviders={["opencode", "oc"]}
+          blockedProviders={["devin-cli-agentic", "dva"]}
           onBlockedChange={onBlockedChange}
           onError={onError}
           testingMode={null}
