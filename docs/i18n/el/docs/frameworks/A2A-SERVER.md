@@ -148,22 +148,22 @@ curl -X POST http://localhost:20128/a2a \
 
 ## Διαθέσιμες Δεξιότητες
 
-Το OmniRoute εκθέτει 6 δεξιότητες A2A που καταχωρούνται στο `src/lib/a2a/taskExecution.ts::A2A_SKILL_HANDLERS`. Κάθε module δεξιότητας βρίσκεται στο `src/lib/a2a/skills/`.
+Το OmniRoute εκθέτει 6 δεξιότητες A2A που είναι συνδεδεμένες στο `src/lib/a2a/taskExecution.ts::A2A_SKILL_HANDLERS`. Κάθε μονάδα δεξιότητας βρίσκεται στο `src/lib/a2a/skills/`.
 
-| Δεξιότητα          | ID                   | Περιγραφή                                                                                                                                          | Ετικέτες                   | Παραδείγματα                           |
-| :----------------- | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------- | :------------------------------------- |
-| Smart Routing      | `smart-routing`      | Δρομολογεί ένα prompt μέσω του βέλτιστου παρόχου/συνδυασμού χρησιμοποιώντας τη μηχανή συνδυασμών και βαθμολόγησης του OmniRoute                    | routing, providers         | "Route this prompt via the best model" |
-| Quota Management   | `quota-management`   | Αναφέρει την κατάσταση ορίου χρήσης ανά πάροχο, βοηθά τους καλούντες να αποφασίσουν πότε να περιορίσουν ή να αλλάξουν πάροχο                       | quota, providers           | "Check quota for anthropic"            |
-| Provider Discovery | `provider-discovery` | Παραθέτει τους εγκατεστημένους παρόχους με τις δυνατότητές τους, σημαίες δωρεάν επιπέδου και κατάσταση OAuth                                       | providers, discovery       | "What providers are available?"        |
-| Cost Analysis      | `cost-analysis`      | Εκτιμά το κόστος ενός αιτήματος/συνομιλίας βάσει του καταλόγου και της πρόσφατης χρήσης                                                            | cost, usage                | "Estimate cost for this conversation"  |
-| Health Report      | `health-report`      | Συγκεντρώνει την κατάσταση του circuit breaker, της περιόδου αναμονής και του αποκλεισμού ανά πάροχο                                               | health, resilience         | "Show health status of all providers"  |
-| List Capabilities  | `list-capabilities`  | Επιστρέφει τον πλήρη κατάλογο 45 δεξιοτήτων Agent (23 API + 21 CLI + 1 διαμόρφωση) ως πίνακα markdown με raw SKILL.md URLs για έγχυση περιεχομένου | catalog, discovery, skills | "List all OmniRoute capabilities"      |
+| Δεξιότητα          | ID                   | Περιγραφή                                                                                                                                                  | Ετικέτες                   | Παραδείγματα                                             |
+| :----------------- | :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------- | :------------------------------------------------------- |
+| Smart Routing      | `smart-routing`      | Δρομολογεί ένα prompt μέσω του βέλτιστου provider/combo χρησιμοποιώντας τη μηχανή combo + βαθμολόγηση του OmniRoute                                        | routing, providers         | "Δρομολόγησε αυτό το prompt μέσω του καλύτερου μοντέλου" |
+| Quota Management   | `quota-management`   | Αναφέρει την κατάσταση quota ανά provider, βοηθά τους καλούντες να αποφασίσουν πότε να επιβραδύνουν/αλλάξουν                                               | quota, providers           | "Έλεγξε το quota για το anthropic"                       |
+| Provider Discovery | `provider-discovery` | Καταγράφει τους εγκατεστημένους providers με δυνατότητες, σημαίες δωρεάν επιπέδου, κατάσταση OAuth                                                         | providers, discovery       | "Ποιοι providers είναι διαθέσιμοι;"                      |
+| Cost Analysis      | `cost-analysis`      | Εκτιμά το κόστος ενός αιτήματος/συνομιλίας με βάση τον κατάλογο + την πρόσφατη χρήση                                                                       | cost, usage                | "Εκτίμησε το κόστος για αυτή τη συνομιλία"               |
+| Health Report      | `health-report`      | Συγκεντρώνει την κατάσταση circuit breaker, cooldown, lockout ανά provider                                                                                 | health, resilience         | "Εμφάνισε την κατάσταση υγείας όλων των providers"       |
+| List Capabilities  | `list-capabilities`  | Επιστρέφει τον πλήρη κατάλογο 45 καταχωρήσεων Agent Skills (23 API + 21 CLI + 1 config) ως πίνακα markdown με ακατέργαστα URL SKILL.md για έγχυση πλαισίου | catalog, discovery, skills | "Κατάγραψε όλες τις δυνατότητες του OmniRoute"           |
 
-> Το Agent Card θα πρέπει να παραμένει συγχρονισμένο με τον ενεργό κατάλογο 352 παρόχων· τα πλήθη παρόχων και τα μεταδεδομένα δωρεάν/χωρίς-πιστοποίηση αντλούνται από το μητρώο εκτέλεσης.
+> Η Agent Card θα πρέπει να παραμένει ευθυγραμμισμένη με τον ζωντανό κατάλογο 375 providers· οι αριθμοί providers και τα μεταδεδομένα free/no-auth προέρχονται από το μητρώο χρόνου εκτέλεσης.
 
-### Λεπτομέρειες Δεξιότητας `list-capabilities`
+### Λεπτομέρειες δεξιότητας `list-capabilities`
 
-Η δεξιότητα `list-capabilities` είναι ιδιαίτερα χρήσιμη για εξωτερικούς agents που χρειάζεται να ανακαλύψουν τι εκθέτει το OmniRoute πριν στείλουν κλήσεις API. Επιστρέφει ένα δομημένο artifact πίνακα markdown:
+Η δεξιότητα `list-capabilities` είναι ιδιαίτερα χρήσιμη για εξωτερικούς agents που πρέπει να ανακαλύψουν τι εκθέτει το OmniRoute πριν στείλουν κλήσεις API. Επιστρέφει ένα δομημένο artifact πίνακα markdown:
 
 ```
 | ID | Name | Category | Area | Endpoints/Commands | Raw URL |
@@ -172,7 +172,7 @@ curl -X POST http://localhost:20128/a2a \
 ...
 ```
 
-Κάθε γραμμή περιλαμβάνει τη στήλη `rawUrl` ώστε οι agents να μπορούν αμέσως να ανακτήσουν το πλήρες SKILL.md. Το πεδίο `metadata.totalSkills` αντικατοπτρίζει το μέγεθος του καταλόγου (45 σήμερα). Υλοποίηση: `src/lib/a2a/skills/listCapabilities.ts`. Δείτε επίσης [AGENT-SKILLS.md](./AGENT-SKILLS.md).
+Κάθε γραμμή περιλαμβάνει τη στήλη `rawUrl` ώστε οι agents να μπορούν να ανακτήσουν αμέσως το πλήρες SKILL.md. Το πεδίο `metadata.totalSkills` αντικατοπτρίζει το μέγεθος του καταλόγου (45 σήμερα). Υλοποίηση: `src/lib/a2a/skills/listCapabilities.ts`. Δείτε επίσης [AGENT-SKILLS.md](./AGENT-SKILLS.md).
 
 ---
 

@@ -146,24 +146,24 @@ curl -X POST http://localhost:20128/a2a \
 
 ---
 
-## Dostupne veštine (Skills)
+## Dostupne veštine
 
 OmniRoute izlaže 6 A2A veština povezanih u `src/lib/a2a/taskExecution.ts::A2A_SKILL_HANDLERS`. Svaki modul veštine se nalazi u `src/lib/a2a/skills/`.
 
-| Veština            | ID                   | Opis                                                                                                                                                             | Tagovi                     | Primeri                                |
-| :----------------- | :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------- | :------------------------------------- |
-| Smart Routing      | `smart-routing`      | Rutira prompt kroz optimalnog provajdera/kombinaciju koristeći OmniRoute-ov combo engine + bodovanje                                                             | routing, providers         | "Route this prompt via the best model" |
-| Quota Management   | `quota-management`   | Prijavljuje stanje kvote po provajderu, pomaže pozivačima da odluče kada da ograniče/promene provajdera                                                          | quota, providers           | "Check quota for anthropic"            |
-| Provider Discovery | `provider-discovery` | Prikazuje listu instaliranih provajdera sa mogućnostima, oznakama besplatnog nivoa, OAuth statusom                                                               | providers, discovery       | "What providers are available?"        |
-| Cost Analysis      | `cost-analysis`      | Procenjuje troškove zahteva/konverzacije na osnovu katalogа i skoraшnjeg korišćenja                                                                              | cost, usage                | "Estimate cost for this conversation"  |
-| Health Report      | `health-report`      | Agregira stanje circuit breaker-a, cooldown-a i zaključavanja po provajderu                                                                                      | health, resilience         | "Show health status of all providers"  |
-| List Capabilities  | `list-capabilities`  | Vraća kompletan katalog od 45 unosa Agent Skills (23 API + 21 CLI + 1 konfiguracija) kao markdown tabelu sa sirovim SKILL.md URL-ovima za ubrizgavanje konteksta | catalog, discovery, skills | "List all OmniRoute capabilities"      |
+| Veština            | ID                   | Opis                                                                                                                                                 | Oznake                     | Primeri                                      |
+| :----------------- | :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------- | :------------------------------------------- |
+| Smart Routing      | `smart-routing`      | Usmerava prompt kroz optimalnog provajdera/kombinaciju koristeći OmniRoute-ov mehanizam za kombinovanje i bodovanje                                  | routing, providers         | "Usmeri ovaj prompt kroz najbolji model"     |
+| Quota Management   | `quota-management`   | Izveštava o stanju kvota po provajderu i pomaže pozivaocima da odluče kada da uspore ili se prebace                                                  | quota, providers           | "Proveri kvotu za anthropic"                 |
+| Provider Discovery | `provider-discovery` | Navodi instalirane provajdere sa mogućnostima, oznakama besplatnog nivoa i OAuth statusom                                                            | providers, discovery       | "Koji provajderi su dostupni?"               |
+| Cost Analysis      | `cost-analysis`      | Procenjuje trošak zahteva/razgovora na osnovu kataloga i skorašnje upotrebe                                                                          | cost, usage                | "Proceni trošak ovog razgovora"              |
+| Health Report      | `health-report`      | Objedinjuje stanje circuit breaker-a, cooldown-a i lockout-a po provajderu                                                                           | health, resilience         | "Prikaži zdravstveni status svih provajdera" |
+| List Capabilities  | `list-capabilities`  | Vraća kompletan katalog Agent Skills sa 45 stavki (23 API + 21 CLI + 1 config) kao markdown tabelu sa raw SKILL.md URL-ovima za ubacivanje konteksta | catalog, discovery, skills | "Navedi sve OmniRoute mogućnosti"            |
 
-> Agent Card treba da bude usklađen sa aktivnim katalogom od 352 provajdera; brojevi provajdera i metapodaci o besplatnom/no-auth pristupu preuzimaju se iz runtime registra.
+> Agent Card treba da bude usklađen sa aktivnim katalogom od 375 provajdera; broj provajdera i metapodaci o besplatnom pristupu/pristupu bez autentifikacije preuzimaju se iz runtime registra.
 
 ### Detalji veštine `list-capabilities`
 
-Veština `list-capabilities` posebno je korisna za eksterne agente kojima je potrebno da otkriju šta OmniRoute izlaže pre slanja API pozива. Vraća strukturisani artefakt u obliku markdown tabele:
+Veština `list-capabilities` je posebno korisna za spoljne agente kojima je potrebno da otkriju šta OmniRoute izlaže pre slanja API poziva. Vraća artefakt u obliku strukturirane markdown tabele:
 
 ```
 | ID | Name | Category | Area | Endpoints/Commands | Raw URL |
@@ -172,7 +172,7 @@ Veština `list-capabilities` posebno je korisna za eksterne agente kojima je pot
 ...
 ```
 
-Svaki red sadrži kolonu `rawUrl` kako bi agenti mogli odmah da preuzmu kompletan SKILL.md. Polje `metadata.totalSkills` odražava veličinu katalogа (45 danas). Implementacija: `src/lib/a2a/skills/listCapabilities.ts`. Pogledajte i [AGENT-SKILLS.md](./AGENT-SKILLS.md).
+Svaki red uključuje kolonu `rawUrl` kako bi agenti odmah mogli da preuzmu kompletan SKILL.md. Polje `metadata.totalSkills` odražava veličinu kataloga (danas 45). Implementacija: `src/lib/a2a/skills/listCapabilities.ts`. Pogledajte takođe [AGENT-SKILLS.md](./AGENT-SKILLS.md).
 
 ---
 

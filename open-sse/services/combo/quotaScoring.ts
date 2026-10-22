@@ -411,15 +411,110 @@ export function resolveExpiryFirstConfig(config: Record<string, unknown> | null 
   };
 }
 
+/** Optional telemetry for `scoreExpiryFirstQuota`; absent or default values leave the score unchanged. */
+export type ExpiryFirstScoreMetrics = {
+  /** Operator-configured plan capacity weight; unset/invalid means 1. */
+  capacityWeight?: number;
+  /** Observed burn (fraction of the window per hour), keyed by lowercase window name. */
+  burnFractionPerHourByWindow?: Record<string, number>;
+};
+
+/** Burn for a window name, also matching scoped variants such as "weekly (spark)". */
+function lookupExpiryFirstBurnRate(
+  rates: Record<string, number> | undefined,
+  windowKey: string
+): number {
+  if (!rates || !windowKey) return 0;
+  let rate = rates[windowKey];
+  if (typeof rate !== "number") {
+    rate = 0;
+    for (const [name, value] of Object.entries(rates)) {
+      if (name.startsWith(`${windowKey} `) && typeof value === "number") {
+        rate = Math.max(rate, value);
+      }
+    }
+  }
+  return Number.isFinite(rate) && rate > 0 ? rate : 0;
+}
+
+function sanitizeExpiryFirstCapacityWeight(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.min(100, value)
+    : 1;
+}
+
+function collectExpiryFirstWindows(
+  quota: Record<string, unknown>
+): Array<{ key: string; window: QuotaWindowSnapshot; session: boolean }> {
+  const windows: Array<{ key: string; window: QuotaWindowSnapshot; session: boolean }> = [];
+  for (const windowName of RESET_WINDOW_NAMES) {
+    const window = resolveQuotaWindowByName(quota, windowName);
+    if (window) windows.push({ key: windowName, window, session: windowName === "session" });
+  }
+  if (windows.length > 0) return windows;
+  return getQuotaWindowEntries(quota).map(({ key, window }) => ({ key, window, session: false }));
+}
+
+type ExpiryFirstDeadlineWindow = { key: string; remaining: number; ms: number };
+
+function nearerExpiryFirstWindow(
+  current: ExpiryFirstDeadlineWindow | null,
+  candidate: ExpiryFirstDeadlineWindow
+): ExpiryFirstDeadlineWindow {
+  return !current || candidate.ms < current.ms ? candidate : current;
+}
+
+/**
+ * Tightest remaining fraction (`usable`), the ms until the deadline and the
+ * window that sets it. The deadline is the nearest reset of a window longer than
+ * the session; a session window is cap-only (it still bounds `usable`) unless it
+ * is the only one or no longer window reports a reset. Null when the snapshot
+ * exposes no window at all.
+ */
+function resolveExpiryFirstDeadline(
+  quota: Record<string, unknown>,
+  nowMs: number
+): { usable: number; msUntilReset: number; deadline: ExpiryFirstDeadlineWindow | null } | null {
+  const windows = collectExpiryFirstWindows(quota);
+  if (windows.length === 0) return null;
+  const hasLongerWindow = windows.some((entry) => !entry.session);
+
+  let usable = 1;
+  let deadline: ExpiryFirstDeadlineWindow | null = null;
+  let sessionDeadline: ExpiryFirstDeadlineWindow | null = null;
+  for (const { key, window, session } of windows) {
+    const resetMs = parseResetTimeMs(window.resetAt);
+    const msLeft = Number.isFinite(resetMs) ? resetMs - nowMs : Number.POSITIVE_INFINITY;
+    const capOnly = session && hasLongerWindow;
+    if (capOnly && msLeft <= 0) continue;
+    const remaining = clamp01(1 - (window.percentUsed ?? 0.5));
+    usable = Math.min(usable, remaining);
+    const entry = { key, remaining, ms: msLeft };
+    if (capOnly) sessionDeadline = nearerExpiryFirstWindow(sessionDeadline, entry);
+    else deadline = nearerExpiryFirstWindow(deadline, entry);
+  }
+  if ((!deadline || !Number.isFinite(deadline.ms)) && sessionDeadline) deadline = sessionDeadline;
+  return { usable, msUntilReset: deadline ? deadline.ms : Number.POSITIVE_INFINITY, deadline };
+}
+
 /**
  * Scores an account for `expiry-first`: how much quota it must spend PER HOUR to
- * avoid losing it at the next reset. Higher score = more urgent to spend here.
+ * avoid losing it at its deadline. Higher score = more urgent to spend here.
  *
- *   legacy score = tightestWindowRemaining / hoursUntilNearestReset
- *   metric-aware score = max(0, usable - observedBurn * hours) * planCapacityWeight / hours
+ *   score = usable / hoursUntilDeadline
  *
- * `usable` is the tightest window's remaining fraction. Burn telemetry projects
- * consumption to the nearest reset, preserving that tightest-window bound.
+ * `usable` is the tightest window's remaining fraction, because nested windows
+ * (a 5h session inside a weekly cap) all decrement together and an account can
+ * never spend more than its most constrained window allows.
+ *
+ * The deadline is the nearest reset of a window longer than the session (weekly,
+ * monthly) when the account has one. A 5h session refills many times before a
+ * weekly cap resets, so what an account loses is what its longer window still
+ * holds at that reset; the session only caps what can be spent right now. Taking
+ * the session reset as the deadline made two subscription accounts trade places
+ * every few hours and ignore weekly resets two days apart. A session whose reset
+ * has already passed has refilled and caps nothing. The session reset is still
+ * the deadline when it is the only window, or when no longer window reports one.
  *
  * Deliberately different from `scoreResetAwareQuota`, which ranks mostly on
  * leftover and adds `resetUrgency * (1 - remaining)` — a RECOVERY signal that
@@ -429,74 +524,48 @@ export function resolveExpiryFirstConfig(config: Record<string, unknown> | null 
  * term also saturates to zero outside the nominal window length, so it cannot
  * separate a reset 69h away from one 145h away at all.
  *
- * Returns 0 for an exhausted account so it is never preferred. Optional metrics
- * subtract observed same-window burn projected through the reset and scale by an
- * estimated plan-capacity weight. Without metrics the legacy score is unchanged.
- * When no window reports a reset, it falls back to weighted leftover.
+ * Returns 0 for an exhausted account so it is never preferred, and falls back to
+ * plain leftover when no window reports a reset time.
  */
 export function scoreExpiryFirstQuota(
   quota: unknown,
   config: ReturnType<typeof resolveExpiryFirstConfig>,
   nowMs: number = Date.now(),
-  metrics?: {
-    capacityWeight?: number;
-    burnFractionPerHourByWindow?: Record<string, number>;
-  }
+  metrics?: ExpiryFirstScoreMetrics
 ): { score: number } {
   if (!quota || !isRecord(quota)) return { score: 0 };
   if (quota.limitReached === true) return { score: 0 };
 
-  const windows: Array<{ key: string; window: QuotaWindowSnapshot }> = [];
-  for (const windowName of RESET_WINDOW_NAMES) {
-    const window = resolveQuotaWindowByName(quota, windowName);
-    if (window) windows.push({ key: windowName, window });
-  }
-  if (windows.length === 0) {
-    windows.push(...getQuotaWindowEntries(quota));
-  }
-  if (windows.length === 0) return { score: 0 };
-
-  let usable = 1;
-  let legacyMsUntilReset = Number.POSITIVE_INFINITY;
-  for (const { window } of windows) {
-    const remaining = clamp01(1 - (window.percentUsed ?? 0.5));
-    usable = Math.min(usable, remaining);
-    const resetMs = parseResetTimeMs(window.resetAt);
-    const resetDeltaMs = Number.isFinite(resetMs) ? resetMs - nowMs : Number.POSITIVE_INFINITY;
-    legacyMsUntilReset = Math.min(legacyMsUntilReset, resetDeltaMs);
-  }
+  const state = resolveExpiryFirstDeadline(quota, nowMs);
+  if (!state) return { score: 0 };
+  const { usable, msUntilReset, deadline } = state;
 
   if (usable <= config.exhaustedFloor) return { score: 0 };
-  if (!metrics) {
-    if (!Number.isFinite(legacyMsUntilReset)) return { score: usable };
-    const legacyHours = Math.max(config.minHours, legacyMsUntilReset / (60 * 60 * 1000));
-    return { score: usable / legacyHours };
-  }
-  const configuredWeight = metrics?.capacityWeight;
-  const capacityWeight =
-    typeof configuredWeight === "number" &&
-    Number.isFinite(configuredWeight) &&
-    configuredWeight > 0
-      ? Math.min(100, configuredWeight)
-      : 1;
-  if (!Number.isFinite(legacyMsUntilReset)) return { score: usable * capacityWeight };
 
-  const burnRates = metrics?.burnFractionPerHourByWindow || {};
-  let score = 0;
-  let hasReset = false;
-  for (const { key, window } of windows) {
-    const resetMs = parseResetTimeMs(window.resetAt);
-    if (!Number.isFinite(resetMs)) continue;
-    hasReset = true;
-    const hours = Math.max(config.minHours, (resetMs - nowMs) / (60 * 60 * 1000));
-    const remaining = clamp01(1 - (window.percentUsed ?? 0.5));
-    const burnRate = Math.max(0, burnRates[key] ?? 0);
-    const projectedRemaining = Math.max(0, remaining - burnRate * hours);
-    const predictedWaste = Math.min(usable, projectedRemaining);
-    score = Math.max(score, (predictedWaste * capacityWeight) / hours);
-  }
-  if (!hasReset) return { score: usable * capacityWeight };
-  return { score };
+  // Optional telemetry (both inert at their defaults: weight 1, burn 0, so the
+  // score below is exactly usable / hours, the no-metrics ordering).
+  const capacityWeight = sanitizeExpiryFirstCapacityWeight(metrics?.capacityWeight);
+  // No reset telemetry at all: the deadline half is unknowable, so rank on
+  // leftover rather than inventing a deadline. Still ordered below any account
+  // that does report one and is under pressure.
+  if (!Number.isFinite(msUntilReset)) return { score: usable * capacityWeight };
+
+  // A non-positive delta means the snapshot predates the reset it describes.
+  // Clamping to minHours treats it as maximally urgent, which is the safe side:
+  // a freshly reset window is full, and re-reading it costs nothing.
+  const hours = Math.max(config.minHours, msUntilReset / (60 * 60 * 1000));
+  // Observed burn on the deadline window is spent before it resets, so only what
+  // is still projected to be left is at risk of being lost. `usable` stays the
+  // upper bound (the session cap and every other window).
+  const burnRate = lookupExpiryFirstBurnRate(
+    metrics?.burnFractionPerHourByWindow,
+    deadline?.key ?? ""
+  );
+  const atRisk =
+    burnRate > 0 && deadline
+      ? Math.min(usable, Math.max(0, deadline.remaining - burnRate * hours))
+      : usable;
+  return { score: (atRisk * capacityWeight) / hours };
 }
 
 export function getResetAwareRemainingPercent(quota: unknown): number {

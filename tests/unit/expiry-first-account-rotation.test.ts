@@ -47,6 +47,7 @@ type Account = {
   priority: number;
   lastUsedAt?: string | null;
   backoffLevel?: number | null;
+  providerSpecificData?: Record<string, unknown> | null;
 };
 
 function view(remainingPercent: number, resetInHours: number) {
@@ -182,18 +183,24 @@ describe("expiry-first account rotation", () => {
     assert.deepEqual(names, ["gpt_5_3_codex_spark_session", "gpt_5_3_codex_spark_weekly"]);
   });
 
-  it("uses a detected plan weight and permits case-insensitive per-provider overrides", () => {
-    assert.equal(resolveExpiryFirstPlanWeight("Ultra"), 4);
-    assert.equal(resolveExpiryFirstPlanWeight("Pro"), 2);
-    assert.equal(resolveExpiryFirstPlanWeight("Claude Max"), 4);
-    assert.equal(resolveExpiryFirstPlanWeight("default_claude_max_20x"), 4);
-    assert.equal(resolveExpiryFirstPlanWeight("team"), 3);
-    assert.equal(resolveExpiryFirstPlanWeight("promax"), 2);
-    assert.equal(resolveExpiryFirstPlanWeight("prolite"), 2);
-    assert.equal(resolveExpiryFirstPlanWeight("unknown"), 1);
+  it("weighs every plan 1 unless the operator opts in with planWeights", () => {
+    for (const plan of [
+      "Ultra",
+      "Pro",
+      "Claude Max",
+      "default_claude_max_20x",
+      "team",
+      "unknown",
+    ]) {
+      assert.equal(resolveExpiryFirstPlanWeight(plan), 1, `${plan} must default to weight 1`);
+    }
+    assert.equal(resolveExpiryFirstPlanWeight(undefined, { ultra: 6 }), 1);
     assert.equal(resolveExpiryFirstPlanWeight("uLtRa", { ultra: 6 }), 6);
-    assert.equal(resolveExpiryFirstPlanWeight("Ultra", { ultra: 0 }), 4);
+    assert.equal(resolveExpiryFirstPlanWeight("Ultra", { ultra: 0 }), 1);
     assert.equal(resolveExpiryFirstPlanWeight("Claude Max", { max: 5 }), 5);
+    assert.equal(resolveExpiryFirstPlanWeight("promax", { pro: 2 }), 2);
+    assert.equal(resolveExpiryFirstPlanWeight("Pro", { ultra: 6 }), 1);
+    assert.equal(resolveExpiryFirstPlanWeight("Ultra", { ultra: 1000 }), 100);
   });
 
   it("reads plan labels from Antigravity, Codex, and Claude connection data", () => {
@@ -208,31 +215,69 @@ describe("expiry-first account rotation", () => {
     assert.equal(getExpiryFirstPlan({ tier: "legacy-tier" }), undefined);
   });
 
-  it("orders equal quota pressure by the detected account plan capacity", () => {
+  it("keeps the incoming order for equal quota pressure when no planWeights are configured", () => {
     const accounts: Account[] = [
-      {
-        id: "pro",
-        priority: 1,
-        providerSpecificData: { plan: "Pro" },
-      },
-      {
-        id: "ultra",
-        priority: 2,
-        providerSpecificData: { plan: "Ultra" },
-      },
+      { id: "pro", priority: 1, providerSpecificData: { plan: "Pro" } },
+      { id: "ultra", priority: 2, providerSpecificData: { plan: "Ultra" } },
     ];
-    const sameQuota = view(50, 2);
-
     assert.equal(
-      selectExpiryFirstConnection(accounts, null, () => sameQuota, NOW, {
+      selectExpiryFirstConnection(accounts, null, () => view(50, 2), NOW, {
         provider: "agy",
         requestedModel: "agy/gemini-3.7-flash-high",
+      })?.id,
+      "pro"
+    );
+  });
+
+  it("orders equal quota pressure by the operator-configured plan weights", () => {
+    const accounts: Account[] = [
+      { id: "pro", priority: 1, providerSpecificData: { plan: "Pro" } },
+      { id: "ultra", priority: 2, providerSpecificData: { plan: "Ultra" } },
+    ];
+    assert.equal(
+      selectExpiryFirstConnection(accounts, null, () => view(50, 2), NOW, {
+        provider: "agy",
+        requestedModel: "agy/gemini-3.7-flash-high",
+        planWeights: { ultra: 4, pro: 2 },
       })?.id,
       "ultra"
     );
   });
 
-  it("accepts account-provided weekly and session capacity independently", () => {
+  it("ranks exactly like the metric-free scorer when no burn data and no weights exist", () => {
+    const accounts: Account[] = POOL.map((a) => ({
+      ...a,
+      providerSpecificData: { plan: "Ultra" },
+    }));
+    const scoped = selectExpiryFirstConnection(accounts, null, (id) => VIEWS[id] ?? null, NOW, {
+      provider: "unknown-provider",
+      requestedModel: "some-model",
+    });
+    assert.equal(scoped?.id, pick(POOL, VIEWS)?.id);
+    const config = resolveExpiryFirstConfig(null);
+    for (const quota of [
+      view(88, 69.3),
+      view(0, 2),
+      view(26, 144.8),
+      { windows: { session: { percentUsed: 0.4, resetAt: null } } },
+      {
+        windows: {
+          session: { percentUsed: 0.5, resetAt: new Date(NOW + HOUR).toISOString() },
+          weekly: { percentUsed: 0.25, resetAt: new Date(NOW + 50 * HOUR).toISOString() },
+        },
+      },
+    ]) {
+      assert.equal(
+        scoreExpiryFirstQuota(quota, config, NOW, {
+          capacityWeight: 1,
+          burnFractionPerHourByWindow: {},
+        }).score,
+        scoreExpiryFirstQuota(quota, config, NOW).score
+      );
+    }
+  });
+
+  it("projects burn on the weekly deadline window and keeps the session cap-only", () => {
     const config = resolveExpiryFirstConfig(null);
     const quota = {
       windows: {
@@ -240,17 +285,28 @@ describe("expiry-first account rotation", () => {
         weekly: { percentUsed: 0.25, resetAt: new Date(NOW + 10 * HOUR).toISOString() },
       },
     };
-    const weighted = scoreExpiryFirstQuota(quota, config, NOW, {
+    // Deadline is the weekly reset (10h), not the 5h session reset (1h): the
+    // session only caps what can be spent (usable = 50%). Session burn is ignored.
+    const sessionBurnOnly = scoreExpiryFirstQuota(quota, config, NOW, {
+      capacityWeight: 2,
+      burnFractionPerHourByWindow: { session: 0.1 },
+    }).score;
+    assert.ok(Math.abs(sessionBurnOnly - (0.5 * 2) / 10) < 1e-9);
+    // Weekly burn 1%/h x 10h = 10% -> 65% still projected, capped by session 50%.
+    const weeklyBurn = scoreExpiryFirstQuota(quota, config, NOW, {
       capacityWeight: 2,
       burnFractionPerHourByWindow: { session: 0.1, weekly: 0.01 },
     }).score;
-
-    // Session: (50% - 10%/h × 1h) × 2 / 1h = 0.8.
-    // Weekly: (75% - 1%/h × 10h) × 2 / 10h = 0.13.
-    assert.ok(Math.abs(weighted - 0.8) < 1e-9);
+    assert.ok(Math.abs(weeklyBurn - (0.5 * 2) / 10) < 1e-9);
+    // Weekly burn 5%/h x 10h = 50% -> 25% projected left.
+    const heavy = scoreExpiryFirstQuota(quota, config, NOW, {
+      capacityWeight: 1,
+      burnFractionPerHourByWindow: { weekly: 0.05 },
+    }).score;
+    assert.ok(Math.abs(heavy - 0.25 / 10) < 1e-9);
   });
 
-  it("applies Codex and Claude plan fields when ranking equal quota pressure", () => {
+  it("applies Codex and Claude plan fields with configured weights when ranking equal quota pressure", () => {
     const sameQuota = view(50, 2);
     const codexAccounts: Account[] = [
       { id: "plus", priority: 1, providerSpecificData: { workspacePlanType: "plus" } },
@@ -265,6 +321,7 @@ describe("expiry-first account rotation", () => {
       selectExpiryFirstConnection(codexAccounts, null, () => sameQuota, NOW, {
         provider: "codex",
         requestedModel: "gpt-5-codex",
+        planWeights: { plus: 1.5, team: 3 },
       })?.id,
       "team"
     );
@@ -272,6 +329,7 @@ describe("expiry-first account rotation", () => {
       selectExpiryFirstConnection(claudeAccounts, null, () => sameQuota, NOW, {
         provider: "anthropic",
         requestedModel: "claude-sonnet",
+        planWeights: { pro: 2, max: 4 },
       })?.id,
       "max"
     );
@@ -290,7 +348,8 @@ describe("expiry-first account rotation", () => {
       burnFractionPerHourByWindow: { session: 0.01, weekly: 0 },
     }).score;
 
-    assert.ok(Math.abs(score - 0.04) < 1e-9);
+    // usable = the 5% session cap, deadline = weekly reset in 10h.
+    assert.ok(Math.abs(score - 0.005) < 1e-9);
   });
 
   it("scores predicted waste with plan capacity and measured burn", () => {
@@ -301,26 +360,41 @@ describe("expiry-first account rotation", () => {
       burnFractionPerHourByWindow: { session: 0.1 },
     }).score;
 
-    // 50% usable - (10%/h * 2h) projected burn = 30% expected waste;
-    // plan capacity 2 => 60 capacity-points / 2h = 0.3 score.
+    // Only window is the session (also the deadline): 50% - (10%/h * 2h) projected
+    // burn = 30% expected waste; plan capacity 2 => 60 capacity-points / 2h = 0.3.
     assert.ok(Math.abs(score - 0.3) < 1e-9, `expected 0.3, received ${score}`);
   });
 
-  it("only applies plan capacity when metrics are explicitly supplied", () => {
+  it("matches scoped window names such as 'weekly (spark)' when looking up burn", () => {
     const config = resolveExpiryFirstConfig(null);
-    const quota = view(50, 2);
-    assert.equal(scoreExpiryFirstQuota(quota, config, NOW).score, 0.25);
-    assert.equal(
-      scoreExpiryFirstQuota(quota, config, NOW, { capacityWeight: 4 }).score,
-      1,
-      "plan weight participates in the explicitly metric-aware score"
-    );
+    const quota = {
+      windows: {
+        "weekly (spark)": { percentUsed: 0.2, resetAt: new Date(NOW + 10 * HOUR).toISOString() },
+      },
+    };
+    const withBurn = scoreExpiryFirstQuota(quota, config, NOW, {
+      burnFractionPerHourByWindow: { "weekly (spark)": 0.04 },
+    }).score;
+    assert.ok(Math.abs(withBurn - 0.4 / 10) < 1e-9);
   });
 
   it("keeps the prior score exactly when no metrics are supplied", () => {
     const config = resolveExpiryFirstConfig(null);
     const quota = view(50, 2);
     assert.equal(scoreExpiryFirstQuota(quota, config, NOW).score, 0.25);
+    assert.equal(scoreExpiryFirstQuota(quota, config, NOW, { capacityWeight: 1 }).score, 0.25);
+  });
+
+  it("weights an explicitly supplied plan capacity and ignores invalid weights", () => {
+    const config = resolveExpiryFirstConfig(null);
+    const quota = view(50, 2);
+    assert.equal(scoreExpiryFirstQuota(quota, config, NOW, { capacityWeight: 4 }).score, 1);
+    assert.equal(scoreExpiryFirstQuota(quota, config, NOW, { capacityWeight: 0 }).score, 0.25);
+    assert.equal(scoreExpiryFirstQuota(quota, config, NOW, { capacityWeight: -3 }).score, 0.25);
+    assert.equal(
+      scoreExpiryFirstQuota(quota, config, NOW, { capacityWeight: Number.NaN }).score,
+      0.25
+    );
   });
 
   it("tracks burn from the start of the same reset window, then smooths later samples", () => {
@@ -460,5 +534,76 @@ describe("expiry-first account rotation", () => {
     assert.ok(scopedNames.includes("gemini-3.7-flash-high"));
     assert.ok(!scopedNames.includes("claude-opus-5-5-high"));
     assert.ok(scoreExpiryFirstQuota(scoped, config, NOW).score > 0);
+  });
+});
+
+/**
+ * Claude subscription pool, measured 2026-10-12/13: a Team account whose week
+ * resets on Friday and a Max account whose week resets on Wednesday, each with a
+ * 5h session inside the weekly cap. Ranked on the nearest reset, the account
+ * whose session happened to roll over next won every few hours, so the Max
+ * account reached its Wednesday reset with 59% of the week unspent.
+ */
+type WindowReading = [remainingPercent: number, resetInHours: number | null];
+
+function claudeView(session: WindowReading, weekly: WindowReading, now: number) {
+  const reading = ([remaining, resetIn]: WindowReading) => ({
+    percentUsed: 1 - remaining / 100,
+    resetAt: resetIn === null ? null : new Date(now + resetIn * HOUR).toISOString(),
+  });
+  return { windows: { "session (5h)": reading(session), "weekly (7d)": reading(weekly) } };
+}
+
+describe("expiry-first with a 5h session inside a weekly cap", () => {
+  const pool: Account[] = [
+    { id: "team", priority: 1 },
+    { id: "max", priority: 2 },
+  ];
+  const pickAt = (now: number, views: Record<string, Record<string, unknown>>) =>
+    selectExpiryFirstConnection(pool, null, (id) => views[id] ?? null, now)?.id;
+  const config = resolveExpiryFirstConfig(null);
+
+  it("ranks on the weekly reset, not on whichever session rolls over first", () => {
+    const t1 = Date.UTC(2026, 9, 12, 12);
+    const t2 = Date.UTC(2026, 9, 13, 22);
+    assert.equal(
+      pickAt(t1, {
+        team: claudeView([95, 3.5], [93, 96], t1),
+        max: claudeView([98, 4.33], [70, 47], t1),
+      }),
+      "max"
+    );
+    assert.equal(
+      pickAt(t2, {
+        team: claudeView([59, 0.5], [69, 62], t2),
+        max: claudeView([92, 1.67], [61, 13], t2),
+      }),
+      "max"
+    );
+  });
+
+  it("hands over to the other account once a weekly window has reset", () => {
+    assert.equal(
+      pickAt(NOW, {
+        team: claudeView([100, 4], [63, 49], NOW),
+        max: claudeView([100, 5], [100, 168], NOW),
+      }),
+      "team"
+    );
+  });
+
+  it("still lets a nearly spent session cap what the account can take now", () => {
+    const score = scoreExpiryFirstQuota(claudeView([2, 1], [60, 2], NOW), config, NOW).score;
+    assert.ok(Math.abs(score - 0.01) < 1e-9, `${score} should be 0.02 / 2h`);
+  });
+
+  it("treats a session whose reset has passed as refilled, not as a deadline", () => {
+    const score = scoreExpiryFirstQuota(claudeView([10, -0.5], [60, 5], NOW), config, NOW).score;
+    assert.ok(Math.abs(score - 0.12) < 1e-9, `${score} should be 0.6 / 5h`);
+  });
+
+  it("falls back to the session reset when the weekly window reports none", () => {
+    const score = scoreExpiryFirstQuota(claudeView([50, 2], [80, null], NOW), config, NOW).score;
+    assert.ok(Math.abs(score - 0.25) < 1e-9, `${score} should be 0.5 / 2h`);
   });
 });

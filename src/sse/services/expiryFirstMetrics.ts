@@ -1,4 +1,10 @@
-/** Quota-window trend and plan-capacity hints for the account `expiry-first` picker. */
+/**
+ * Quota-window trend and plan-capacity hints for the account `expiry-first` picker.
+ *
+ * Plan capacity weights are OPT-IN: they come only from the operator's
+ * `providerStrategies.<provider>.planWeights` setting. Without it every plan
+ * weighs 1 and the score matches the plain weekly-deadline formula.
+ */
 
 import { getQuotaCache } from "@/domain/quotaCache";
 import { filterQuotaBurnMetrics, type QuotaBurnMetrics } from "@/domain/quotaBurnMetrics";
@@ -7,18 +13,6 @@ import {
   selectAntigravityQuotaWindowNames,
 } from "@omniroute/open-sse/services/antigravityQuotaFamily.ts";
 import { getCodexQuotaWindowFilterForModel } from "@omniroute/open-sse/config/codexQuotaScopes.ts";
-
-const DEFAULT_PLAN_WEIGHTS: Readonly<Record<string, number>> = Object.freeze({
-  ultra: 4,
-  max: 4,
-  enterprise: 3,
-  business: 3,
-  team: 3,
-  pro: 2,
-  plus: 1.5,
-  lite: 1,
-  free: 1,
-});
 
 export type ExpiryFirstScope = {
   provider: string;
@@ -75,7 +69,9 @@ export function resolveExpiryFirstPlanWeight(
     }
   }
 
-  return DEFAULT_PLAN_WEIGHTS[canonical] ?? 1;
+  // Opt-in: there is no built-in capacity table. A plan without an operator
+  // override weighs 1, which leaves the expiry-first ordering unchanged.
+  return 1;
 }
 
 export function getExpiryFirstPlan(connectionData: unknown): string | undefined {

@@ -146,33 +146,33 @@ curl -X POST http://localhost:20128/a2a \
 
 ---
 
-## Beschikbare vaardigheden
+## Beschikbare skills
 
-OmniRoute biedt 6 A2A-vaardigheden die zijn gekoppeld in `src/lib/a2a/taskExecution.ts::A2A_SKILL_HANDLERS`. Elke vaardigheidsmodule bevindt zich in `src/lib/a2a/skills/`.
+OmniRoute stelt 6 A2A-skills beschikbaar die zijn gedefinieerd in `src/lib/a2a/taskExecution.ts::A2A_SKILL_HANDLERS`. Elke skill-module bevindt zich in `src/lib/a2a/skills/`.
 
-| Vaardigheid         | ID                   | Beschrijving                                                                                                                                                        | Tags                              | Voorbeelden                               |
-| :------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------------- | :---------------------------------------- |
-| Slimme routering    | `smart-routing`      | Routeert een prompt via de optimale provider/combinatie met behulp van de combinatie-engine en scoreberekening van OmniRoute                                        | routering, providers              | "Routeer deze prompt via het beste model" |
-| Quotabeheer         | `quota-management`   | Rapporteert de quotastatus per provider en helpt aanroepers te bepalen wanneer ze moeten beperken/overschakelen                                                     | quota, providers                  | "Controleer het quota voor anthropic"     |
-| Providerdetectie    | `provider-discovery` | Toont geïnstalleerde providers met mogelijkheden, gratis-niveau-indicatoren en OAuth-status                                                                         | providers, detectie               | "Welke providers zijn beschikbaar?"       |
-| Kostenanalyse       | `cost-analysis`      | Schat de kosten van een aanvraag/gesprek op basis van de catalogus en het recente gebruik                                                                           | kosten, gebruik                   | "Schat de kosten voor dit gesprek"        |
-| Statusrapport       | `health-report`      | Aggregeert de status van circuitonderbrekers, afkoelperioden en blokkeringen per provider                                                                           | status, veerkracht                | "Toon de status van alle providers"       |
-| Mogelijkheden tonen | `list-capabilities`  | Retourneert de volledige catalogus met 45 Agent Skills (23 API + 21 CLI + 1 configuratie) als een markdown-tabel met onbewerkte SKILL.md-URL's voor contextinjectie | catalogus, detectie, vaardigheden | "Toon alle mogelijkheden van OmniRoute"   |
+| Skill              | ID                   | Beschrijving                                                                                                                                        | Tags                       | Voorbeelden                            |
+| :----------------- | :------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------- | :------------------------------------- |
+| Smart Routing      | `smart-routing`      | Routeert een prompt via de optimale provider/combo met behulp van OmniRoute's combo-engine + scoring                                                | routing, providers         | "Route this prompt via the best model" |
+| Quota Management   | `quota-management`   | Rapporteert de quotumstatus per provider en helpt aanroepers te beslissen wanneer ze moeten throttelen of overschakelen                             | quota, providers           | "Check quota for anthropic"            |
+| Provider Discovery | `provider-discovery` | Toont geïnstalleerde providers met mogelijkheden, free-tier-vlaggen en OAuth-status                                                                 | providers, discovery       | "What providers are available?"        |
+| Cost Analysis      | `cost-analysis`      | Schat de kosten van een verzoek/gesprek op basis van de catalogus + recent gebruik                                                                  | cost, usage                | "Estimate cost for this conversation"  |
+| Health Report      | `health-report`      | Aggregeert de status van circuit breaker, cooldown en lockout per provider                                                                          | health, resilience         | "Show health status of all providers"  |
+| List Capabilities  | `list-capabilities`  | Geeft de volledige catalogus met 45 Agent Skills (23 API + 21 CLI + 1 config) terug als markdown-tabel met ruwe SKILL.md-URL's voor contextinjectie | catalog, discovery, skills | "List all OmniRoute capabilities"      |
 
-> De Agent Card moet gesynchroniseerd blijven met de actuele catalogus van 352 providers; aantallen providers en metadata over gratis/geen-authenticatie worden verkregen uit het runtimeregister.
+> De Agent Card moet worden afgestemd op de live catalogus met 375 providers; het aantal providers en de free/no-auth-metadata zijn afkomstig uit het runtime-register.
 
-### Details van de vaardigheid `list-capabilities`
+### Details van de skill `list-capabilities`
 
-De vaardigheid `list-capabilities` is met name nuttig voor externe agents die moeten ontdekken wat OmniRoute beschikbaar stelt voordat ze API-aanroepen verzenden. De vaardigheid retourneert een gestructureerd markdown-tabelartefact:
+De skill `list-capabilities` is vooral nuttig voor externe agents die moeten ontdekken wat OmniRoute aanbiedt voordat ze API-aanroepen versturen. De skill retourneert een gestructureerd markdown-tabel-artifact:
 
 ```
-| ID | Naam | Categorie | Gebied | Eindpunten/opdrachten | Onbewerkte URL |
+| ID | Name | Category | Area | Endpoints/Commands | Raw URL |
 | --- | --- | --- | --- | --- | --- |
-| omni-auth | Authenticatie en sessies | api | auth | POST /api/auth/login, ... | https://raw.githubusercontent.com/... |
+| omni-auth | Auth & Sessions | api | auth | POST /api/auth/login, ... | https://raw.githubusercontent.com/... |
 ...
 ```
 
-Elke rij bevat de kolom `rawUrl`, zodat agents onmiddellijk het volledige SKILL.md-bestand kunnen ophalen. Het veld `metadata.totalSkills` weerspiegelt de grootte van de catalogus (momenteel 45). Implementatie: `src/lib/a2a/skills/listCapabilities.ts`. Zie ook [AGENT-SKILLS.md](./AGENT-SKILLS.md).
+Elke rij bevat de kolom `rawUrl`, zodat agents direct de volledige SKILL.md kunnen ophalen. Het veld `metadata.totalSkills` weerspiegelt de omvang van de catalogus (vandaag 45). Implementatie: `src/lib/a2a/skills/listCapabilities.ts`. Zie ook [AGENT-SKILLS.md](./AGENT-SKILLS.md).
 
 ---
 
