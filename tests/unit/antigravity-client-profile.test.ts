@@ -111,9 +111,10 @@ test("content header application emits IDE and CLI identities and strips fake he
 
   assert.match(ideHeaders["User-Agent"], /^antigravity\/ide\/2\.1\.1 /);
   assert.match(ideHeaders["User-Agent"], / darwin\/arm64$| windows\/amd64$| linux\/[^ ]+$/);
+  // 1.1.1 has no recorded changelist, so `cl=` is omitted rather than borrowed from 1.4.4.
   assert.match(
     cliHeaders["User-Agent"],
-    /^antigravity\/cli\/1\.1\.1 \(aidev_client; os_type=.+; arch=.+; cl=\d+; auth_method=consumer\)$/
+    /^antigravity\/cli\/1\.1\.1 \(aidev_client; os_type=.+; arch=.+; auth_method=consumer\)$/
   );
   assertIdentityHeadersAbsent(ideHeaders);
   assertIdentityHeadersAbsent(cliHeaders);
