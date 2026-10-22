@@ -113,12 +113,13 @@ test("content header application emits IDE and CLI identities and strips fake he
   assert.match(ideHeaders["User-Agent"], / darwin\/arm64$| windows\/amd64$| linux\/[^ ]+$/);
   assert.match(
     cliHeaders["User-Agent"],
-    /^antigravity\/cli\/1\.1\.1 \(aidev_client; os_type=.+; arch=.+; auth_method=consumer\)$/
+    /^antigravity\/cli\/1\.1\.1 \(aidev_client; os_type=.+; arch=.+; cl=\d+; auth_method=consumer\)$/
   );
   assertIdentityHeadersAbsent(ideHeaders);
   assertIdentityHeadersAbsent(cliHeaders);
+  // The Go CLI (consumer auth) sends no quota-project header; only the IDE profile does.
   assert.equal(ideHeaders["x-goog-user-project"], "project-1");
-  assert.equal(cliHeaders["x-goog-user-project"], "project-1");
+  assert.equal(cliHeaders["x-goog-user-project"], undefined);
 });
 
 test("public request envelopes never infer the internal jetski identity from email", () => {
