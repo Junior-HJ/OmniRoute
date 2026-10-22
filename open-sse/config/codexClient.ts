@@ -26,7 +26,7 @@ export type CodexClientVersionFetch = (
   init: SafeOutboundFetchOptions & { method: "GET"; headers: Record<string, string> }
 ) => Promise<Response>;
 
-type CodexClientVersionSource = "override" | "registry" | "fallback";
+type CodexClientVersionSource = "override" | "registry" | "pinned" | "fallback";
 
 let cachedCodexVersion: string | null = null;
 let codexVersionRefreshAt = 0;
@@ -76,7 +76,9 @@ function reportCodexVersionFallback(reason: string): void {
 /**
  * Which version the next upstream call will advertise. `fallback` means the
  * last refresh failed and the catalog may be short (#16714); `registry` means
- * the npm metadata was applied; `override` means CODEX_CLIENT_VERSION won.
+ * the npm metadata was applied; `pinned` means the registry answered but is not
+ * newer than the built-in floor (healthy, nothing to fix); `override` means
+ * CODEX_CLIENT_VERSION won.
  */
 export function getCodexClientVersionSource(): CodexClientVersionSource {
   if (getSafeEnvValue(CODEX_VERSION_OVERRIDE_ENV, SAFE_HEADER_TOKEN_PATTERN)) return "override";
@@ -265,9 +267,11 @@ export function refreshCodexClientVersion(fetchImpl: CodexClientVersionFetch): P
             codexVersionSource = "registry";
             refreshAfter = CODEX_VERSION_CACHE_TTL_MS;
           } else {
-            reportCodexVersionFallback(
-              `registry reported the older ${parsed.data.version}; keeping ${getCodexClientVersion()}`
-            );
+            // The pin is a floor, so a registry that lags behind it is healthy:
+            // nothing failed, there is nothing to warn about and no reason to
+            // retry sooner than a successful refresh would.
+            if (!cachedCodexVersion) codexVersionSource = "pinned";
+            refreshAfter = CODEX_VERSION_CACHE_TTL_MS;
           }
         } else {
           reportCodexVersionFallback("registry metadata did not match the expected shape");
