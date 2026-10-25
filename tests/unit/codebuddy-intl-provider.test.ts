@@ -41,11 +41,14 @@ test("codebuddy-intl registry entry has expected shape", () => {
   assert.equal(r.authHeader, "bearer");
   assert.equal(r.headers?.["User-Agent"], CODEBUDDY_INTL_USER_AGENT);
   assert.equal(r.headers?.["X-Product"], "SaaS");
-  assert.equal(r.headers?.["X-IDE-Type"], "IDE");
-  assert.equal(r.headers?.["X-IDE-Name"], "IDE");
+  assert.equal(r.headers?.["X-IDE-Type"], "CLI");
+  assert.equal(r.headers?.["X-IDE-Name"], "CLI");
   assert.equal(r.headers?.["x-codebuddy-request"], "1");
   assert.ok(Array.isArray(r.models), "models array expected");
-  assert.equal(r.models.length, 22, "probed intl lineup: 22 models");
+  // 22 previously curated − 5 stale + 8 captured = 25 named models. The
+  // `/v3/config` catalog lists 27; the remainder is added at runtime by
+  // open-sse/executors/codebuddy-intl/catalog.ts.
+  assert.equal(r.models.length, 25, "curated lineup aligned with the /v3/config catalog");
 });
 
 test("codebuddy-intl carries GLM, Kimi, MiniMax, Hy, GPT, Gemini and DeepSeek models", () => {
@@ -55,7 +58,7 @@ test("codebuddy-intl carries GLM, Kimi, MiniMax, Hy, GPT, Gemini and DeepSeek mo
   assert.ok(modelIds.includes("glm-5.3"));
   assert.ok(modelIds.includes("glm-5.3-flash"));
   assert.ok(modelIds.includes("kimi-k3"));
-  assert.ok(modelIds.includes("kimi-k2.7"));
+  assert.ok(modelIds.includes("kimi-k3.1-pro"));
   assert.ok(modelIds.includes("minimax-m3"));
   assert.ok(modelIds.includes("hy3"));
   assert.ok(modelIds.includes("hy4-preview"));

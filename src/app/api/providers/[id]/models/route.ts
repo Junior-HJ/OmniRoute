@@ -34,6 +34,7 @@ import {
   type DiscoveryFailure,
 } from "@/shared/discovery/degradedCause";
 import { getStaticQoderModels } from "@omniroute/open-sse/services/qoderCli.ts";
+import { discoverCodeBuddyIntlModels } from "@omniroute/open-sse/services/codebuddyIntlCatalog.ts";
 import { getCodexDiscoveryMode } from "@/shared/services/codexDiscoveryPolicy";
 import { deriveConfigFromRegistryModelsUrl } from "./discoveryConfig";
 import { recordDiscoveryOutcome } from "./discovery/discoveryOutcome";
@@ -680,6 +681,87 @@ export async function GET(
           source: "local_catalog",
           intentional: true,
           warning: "MaxAI catalog unavailable — using curated model list",
+        });
+      }
+    }
+
+    // CodeBuddy International: the authoritative catalog is the authenticated
+    // `GET /v3/config?repos[]=` (the gateway publishes no `/models`). Discovery
+    // is best-effort: on any failure the curated registry list is the answer, so
+    // a broken catalog endpoint can never empty the model picker.
+    if (provider === "codebuddy-intl") {
+      const cachedResponse = maybeReturnCachedDiscovery();
+      if (cachedResponse) return cachedResponse;
+
+      const autoFetchDisabledResponse = maybeReturnAutoFetchDisabled();
+      if (autoFetchDisabledResponse) return autoFetchDisabledResponse;
+
+      const token = apiKey || accessToken;
+      if (!token) {
+        const fallback = buildDiscoveryFallbackResponse({
+          cacheWarning: "No access token — using cached catalog",
+          localWarning: "No access token — using curated catalog",
+        });
+        if (fallback) return fallback;
+        return buildResponse({
+          provider,
+          connectionId,
+          models: getModelsByProviderId(provider),
+          source: "local_catalog",
+          intentional: true,
+          warning: "No access token — using the curated CodeBuddy model list",
+        });
+      }
+
+      try {
+        const result = await discoverCodeBuddyIntlModels({
+          accessToken: token,
+          accountKey: connectionId,
+          fetchImpl: (url, init) =>
+            safeOutboundFetch(url, {
+              ...SAFE_OUTBOUND_FETCH_PRESETS.modelsDiscovery,
+              guard: getProviderOutboundGuard(),
+              proxyConfig: proxy,
+              ...init,
+            }),
+        });
+
+        if (result.ok && result.models.length > 0) {
+          return buildApiDiscoveryResponse(
+            result.models,
+            result.cached ? "Served from the cached CodeBuddy catalog" : undefined
+          );
+        }
+
+        const fallback = buildDiscoveryFallbackResponse({
+          cacheWarning: "CodeBuddy /v3/config failed — using cached catalog",
+          localWarning: "CodeBuddy /v3/config failed — using curated catalog",
+        });
+        if (fallback) return fallback;
+        return buildResponse({
+          provider,
+          connectionId,
+          models: getModelsByProviderId(provider),
+          source: "local_catalog",
+          intentional: true,
+          warning: "CodeBuddy catalog unavailable — using the curated model list",
+        });
+      } catch (error) {
+        console.log("Error fetching models from codebuddy-intl", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        const fallback = buildDiscoveryFallbackResponse({
+          cacheWarning: "CodeBuddy catalog request threw — using cached catalog",
+          localWarning: "CodeBuddy catalog request threw — using curated catalog",
+        });
+        if (fallback) return fallback;
+        return buildResponse({
+          provider,
+          connectionId,
+          models: getModelsByProviderId(provider),
+          source: "local_catalog",
+          intentional: true,
+          warning: "CodeBuddy catalog request failed — using the curated model list",
         });
       }
     }
