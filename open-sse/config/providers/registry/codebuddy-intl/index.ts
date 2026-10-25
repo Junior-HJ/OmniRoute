@@ -26,6 +26,13 @@ export const codebuddy_intlProvider: RegistryEntry = {
   alias: "cbai",
   format: "openai",
   executor: "codebuddy-intl",
+  // The gateway rejects a non-streaming upstream call (code 11101), and the CLI
+  // body always sets `stream: true` (see codebuddy-intl/body.ts). Declaring it
+  // here is what makes chatCore treat a forced SSE reply as EXPECTED for a
+  // `stream: false` client: it drains the stream through the byte-capped SSE
+  // reader instead of buffering it with `response.text()` and logging an
+  // "Unexpected SSE response" warning on every non-streaming request.
+  forceStream: true,
   baseUrl: "https://www.codebuddy.ai/v2/chat/completions",
   authType: "oauth",
   authHeader: "bearer",
