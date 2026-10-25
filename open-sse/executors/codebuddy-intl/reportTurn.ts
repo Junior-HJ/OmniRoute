@@ -35,8 +35,18 @@ export interface ReportTurnInput {
   fetchImpl?: typeof fetch;
 }
 
-/** Telemetry is ON by default; `OMNIROUTE_CODEBUDDY_TELEMETRY=0|false|off` disables it. */
-export function isCodeBuddyTelemetryEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+/**
+ * Telemetry is ON by default; `OMNIROUTE_CODEBUDDY_TELEMETRY=0|false|off` disables it.
+ *
+ * The default argument reads the variable in its literal `process.env` member
+ * form on purpose: `check:env-doc-sync` only recognises that spelling, so the
+ * dynamic `env[CODEBUDDY_TELEMETRY_ENV]` read that keeps this function
+ * injectable would leave the switch outside the documented env contract.
+ * Reading it in the default keeps it evaluated per call.
+ */
+export function isCodeBuddyTelemetryEnabled(
+  env: NodeJS.ProcessEnv = { [CODEBUDDY_TELEMETRY_ENV]: process.env.OMNIROUTE_CODEBUDDY_TELEMETRY }
+): boolean {
   const raw = (env[CODEBUDDY_TELEMETRY_ENV] || "").trim().toLowerCase();
   return !(raw === "0" || raw === "false" || raw === "off" || raw === "no");
 }
