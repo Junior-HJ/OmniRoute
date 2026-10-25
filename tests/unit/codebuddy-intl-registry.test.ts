@@ -69,3 +69,11 @@ test("reasoning-capable models declare a max output budget", () => {
     assert.equal(typeof model.maxOutputTokens, "number", `no maxOutputTokens for ${model.id}`);
   }
 });
+
+test("the provider declares forceStream, matching the CLI body", () => {
+  // The gateway rejects a non-streaming upstream call (code 11101) and the CLI
+  // body always sets `stream: true`, so `stream: false` clients still get SSE.
+  // Without this flag chatCore buffers that SSE with `response.text()` and logs
+  // it as unexpected, instead of draining it through the byte-capped reader.
+  assert.equal(codebuddy_intlProvider.forceStream, true);
+});
