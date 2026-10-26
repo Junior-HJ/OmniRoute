@@ -14,6 +14,15 @@
  * already honors. Implementing a second, executor-local freeze here would give
  * lockout two sources of truth that can disagree about when an account is
  * eligible again.
+ *
+ * VERIFIED live 2026-10-26: the real gateway does NOT send `data.resetTime`.
+ * Its 429 states the unlock instant in prose inside `msg`
+ * ("...your usage will reset at YYYY-MM-DD HH:MM:SS", zone-less, read as UTC),
+ * which the shared text parser already understands. What blocked the freeze was
+ * the resolved OAuth connection-cooldown profile (`useUpstreamRetryHints:
+ * false` for every OAuth provider) plus the operator's `maxCooldownMs` cap;
+ * `RegistryEntry.trustUpstreamResetDate` is the per-provider opt-in that fixes
+ * both without touching the category-wide policy.
  */
 
 export type LockoutSource = "body-date" | "retry-after" | "none";

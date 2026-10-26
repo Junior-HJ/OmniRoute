@@ -361,7 +361,7 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
         return {
           status: 429,
           message:
-            `CodeBuddy International rate limit: the account is frozen until ` +
+            `CodeBuddy International rate limit: the account must wait until ` +
             `${new Date(parsed.resetAtMs as number).toISOString()} ` +
             `(source: ${parsed.source}). It must not be retried before that date.`,
           resetsAtMs: parsed.resetAtMs as number,
