@@ -36,6 +36,12 @@ export const codebuddy_intlProvider: RegistryEntry = {
   baseUrl: "https://www.codebuddy.ai/v2/chat/completions",
   authType: "oauth",
   authHeader: "bearer",
+  // The gateway's 429 states its own unlock instant in prose
+  // ("...your usage will reset at YYYY-MM-DD HH:MM:SS"), which the shared body
+  // parser already reads as UTC. Opt this provider in so that date freezes the
+  // account instead of degrading to the 5s OAuth transient cooldown.
+  // VERIFIED live 2026-10-26 against a real 429 capture.
+  trustUpstreamResetDate: true,
   headers: {
     "User-Agent": CODEBUDDY_INTL_USER_AGENT,
     "X-Product": "SaaS",
