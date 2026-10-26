@@ -15,6 +15,12 @@
  * (camelCase AND snake_case). Accepting an extra alias is harmless — an unknown
  * key simply never matches — while guessing a single spelling would silently
  * drop capabilities. Narrow this list once a real payload is captured.
+ *
+ * Live evidence (2026-10-26): `GET /v3/config?repos[]=` answers 28 entries that
+ * OmniRoute turns into 28 models, and the ids are served correctly, so the
+ * extraction path works. What was NOT captured is the per-entry field spelling
+ * (capabilities/limits), because the fetch is consumed inside the server and
+ * only the derived `{id, name, supportsVision}` reaches the models route.
  */
 
 export interface CodeBuddyCatalogModel {

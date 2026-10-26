@@ -60,6 +60,22 @@ export interface ReportBatch {
   sessionId: string;
   accountId?: string;
   batchRequestId: string;
+  /**
+   * Terminal event of the batch, at the TOP LEVEL of the envelope.
+   *
+   * Verified against the live gateway: `/v2/report` reads `eventCode` here, not
+   * inside `events[]`. Sending it only per event is rejected with
+   * `10001:eventCode is empty or not string`.
+   */
+  eventCode: string;
+  /**
+   * Milliseconds the client held the batch before reporting. The gateway accepts
+   * `reportDelay` on its own; it is always sent so a batch never trips the
+   * "event missing both reportDelay and timestamp fields" validation.
+   */
+  reportDelay: number;
+  /** Epoch milliseconds. When present the gateway requires a float64, never an ISO string. */
+  timestamp?: number;
   events: ReportEvent[];
 }
 
@@ -207,6 +223,17 @@ export class CodeBuddyTelemetrySession {
   buildBatch(): ReportBatch {
     const events = this.buffer;
     this.buffer = [];
+    // The envelope's `eventCode`/`reportDelay`/`timestamp` are the fields the
+    // gateway validates (verified live — see ReportBatch). The terminal event
+    // names the batch; the oldest event stamps when it was observed.
+    const terminal = events.length ? events[events.length - 1] : null;
+    const first = events.length ? events[0] : null;
+    const observedAtMs = first ? Date.parse(first.presentAt) : NaN;
+    const reportDelay =
+      Number.isFinite(observedAtMs) && observedAtMs > 0
+        ? Math.max(0, Date.now() - observedAtMs)
+        : 0;
+
     return {
       version: CODEBUDDY_INTL_CLI.version,
       featureModule: "cli_local",
@@ -214,6 +241,9 @@ export class CodeBuddyTelemetrySession {
       sessionId: this.sessionId,
       accountId: this.accountId,
       batchRequestId: hexId(16),
+      eventCode: terminal ? String(terminal.event) : "",
+      reportDelay,
+      timestamp: Date.now(),
       events,
     };
   }
