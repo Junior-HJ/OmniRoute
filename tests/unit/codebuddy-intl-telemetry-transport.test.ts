@@ -66,6 +66,13 @@ test("the report batch is POSTed to /v2/report with the CLI identity", async () 
   const body = JSON.parse(String(calls[0].init.body)) as Record<string, unknown>;
   assert.equal(body.version, "2.175.0");
   assert.equal(Array.isArray(body.events), true);
+
+  // Envelope contract verified against the live gateway (HTTP 400
+  // "10001:eventCode is empty or not string" without it): the terminal event is
+  // named at the TOP LEVEL, and reportDelay/timestamp live there too.
+  assert.equal(body.eventCode, "chat_request_response");
+  assert.equal(typeof body.reportDelay, "number");
+  assert.equal(typeof body.timestamp, "number");
 });
 
 test("an empty batch is not sent at all", async () => {

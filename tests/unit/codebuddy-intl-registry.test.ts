@@ -24,7 +24,6 @@ test("the registry advertises the CLI client, not the IDE", () => {
 
 test("every model captured in /v3/config is offered", () => {
   const captured = [
-    "step-5-preview",
     "deepseek-v4.1-flash-sg",
     "gpt-6.1-sol",
     "gemini-3.8-flash",
@@ -41,7 +40,18 @@ test("every model captured in /v3/config is offered", () => {
 });
 
 test("models the gateway no longer serves are not offered", () => {
-  const stale = ["kimi-k2.7", "kimi-k2.6", "glm-5.1", "glm-5v-turbo", "gpt-5.3-codex"];
+  // The first five were retired before the 2026-10-26 live capture; the last
+  // three disappeared from /v3/config by that capture and are gone now.
+  const stale = [
+    "kimi-k2.7",
+    "kimi-k2.6",
+    "glm-5.1",
+    "glm-5v-turbo",
+    "gpt-5.3-codex",
+    "gemini-3.5-flash",
+    "minimax-m3",
+    "step-5-preview",
+  ];
 
   const ids = modelIds();
   for (const id of stale) {

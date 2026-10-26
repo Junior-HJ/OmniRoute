@@ -18,9 +18,12 @@ import type { ReportBatch } from "./telemetry.ts";
  * account data).
  *
  * OTLP wire format: the captured CLI sends protobuf. This module sends
- * OTLP/HTTP **JSON** because it needs no protobuf runtime. UNVERIFIED whether
- * the gateway accepts the JSON encoding; a rejection is reported as a non-fatal
- * send failure, so the chat path is unaffected either way.
+ * OTLP/HTTP **JSON** because it needs no protobuf runtime.
+ *
+ * VERIFIED live against https://www.codebuddy.ai: `POST /v1/traces` accepts the
+ * JSON encoding and answers HTTP 200, so no protobuf dependency is needed.
+ * `POST /v2/report` additionally requires `eventCode` + `reportDelay` at the top
+ * level of the envelope (see ReportBatch in telemetry.ts).
  */
 
 export const CODEBUDDY_REPORT_PATH = "/v2/report";

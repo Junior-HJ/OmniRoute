@@ -134,14 +134,6 @@ export const codebuddy_intlProvider: RegistryEntry = {
       supportsVision: true,
     },
     {
-      id: "gemini-3.5-flash",
-      name: "Gemini-3.5-Flash",
-      contextLength: 1000000,
-      maxOutputTokens: 64000,
-      supportsReasoning: true,
-      supportsVision: true,
-    },
-    {
       id: "glm-5.3",
       name: "GLM-5.3",
       contextLength: 1000000,
@@ -161,14 +153,6 @@ export const codebuddy_intlProvider: RegistryEntry = {
       contextLength: 1000000,
       maxOutputTokens: 48000,
       supportsReasoning: true,
-    },
-    {
-      id: "minimax-m3",
-      name: "MiniMax-M3",
-      contextLength: 512000,
-      maxOutputTokens: 48000,
-      supportsReasoning: true,
-      supportsVision: true,
     },
     {
       id: "minimax-m3.1-flash",
@@ -205,13 +189,6 @@ export const codebuddy_intlProvider: RegistryEntry = {
     {
       id: "grok-4.7",
       name: "Grok-4.7",
-      contextLength: 256000,
-      maxOutputTokens: 32000,
-      supportsReasoning: true,
-    },
-    {
-      id: "step-5-preview",
-      name: "Step-5-Preview",
       contextLength: 256000,
       maxOutputTokens: 32000,
       supportsReasoning: true,
