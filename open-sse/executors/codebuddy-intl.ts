@@ -5,6 +5,7 @@ import {
   buildCorrelationHeaders,
   createOperationContext,
   createRootContext,
+  deriveRetryContext,
   type AgentPurpose,
   type CodeBuddyOperationContext,
 } from "./codebuddy-intl/context.ts";
@@ -174,6 +175,10 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
    * instance field would leak ids across requests: executors are cached
    * singletons (`open-sse/executors/registry.ts`) shared by every in-flight
    * turn, and `WeakMap` also releases the entry once the request is done.
+   *
+   * The stored value is the LATEST attempt of that body: a base-executor retry
+   * re-enters `buildHeaders` with the same body, which derives a new attempt
+   * from the stored one instead of replaying the failed attempt's identity.
    */
   private readonly operations = new WeakMap<object, CodeBuddyOperationContext>();
 
@@ -197,9 +202,9 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
     try {
       result = await super.execute(input);
     } catch (error) {
+      // The operation stored for this body is the attempt that threw, so its
+      // span/trace describe the attempt that actually failed.
       const op = this.peekOperation(input.body);
-      // No operation means the request never reached the wire, so there is
-      // nothing to correlate and nothing to report.
       if (op) {
         void reportTurn({
           op,
@@ -224,7 +229,6 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
         endedAtMs: Date.now(),
         credentials: input.credentials,
         status: response?.ok ? "success" : "error",
-        usage: (result as { usage?: unknown }).usage,
       });
     }
 
@@ -242,8 +246,9 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
     const headers = super.buildHeaders(credentials, stream, clientHeaders, model, _health, body);
     try {
       const correlation = resolveCorrelationContext(headers, body);
-      this.rememberOperation(body, correlation);
-      return applyCliProfile(headers, correlation);
+      this.rememberAttempt(body, correlation);
+      const op = this.peekOperation(body) ?? correlation;
+      return applyCliProfile(headers, op);
     } catch (error) {
       const err = error as Error | undefined;
       throw new Error(
@@ -280,14 +285,23 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
     return applyCliBody(out, { op: operation });
   }
 
-  /** Record the operation under this request's body object (the shared key). */
-  private rememberOperation(body: unknown, op: CodeBuddyOperationContext): void {
-    if (body && typeof body === "object") {
-      this.operations.set(body as object, op);
-    }
+  /**
+   * Record an attempt for this body.
+   *
+   * `buildHeaders` runs once per upstream attempt (including the base
+   * executor's intra-retries), so seeing the same body again means the previous
+   * attempt failed and is being re-sent. Deriving instead of overwriting keeps
+   * the conversation identity while advancing the attempt counter, allocating a
+   * fresh span and minting a fresh message for this dispatch — which is what the
+   * gateway's `x-stainless-retry-count` and the telemetry both describe.
+   */
+  private rememberAttempt(body: unknown, op: CodeBuddyOperationContext): void {
+    if (!body || typeof body !== "object") return;
+    const previous = this.operations.get(body as object);
+    this.operations.set(body as object, previous ? deriveRetryContext(previous) : op);
   }
 
-  /** The operation recorded for this request, if it was ever built. */
+  /** The operation (latest attempt) recorded for this request, if any. */
   private peekOperation(body: unknown): CodeBuddyOperationContext | null {
     if (!body || typeof body !== "object") return null;
     return this.operations.get(body as object) ?? null;

@@ -221,10 +221,3 @@ export function mergeCatalogWithCurated<T extends { id: string }>(
 
   return { models, added, stale };
 }
-
-/** Shape the merged catalog for `modelDiscovery`'s normalized output. */
-export function toDiscoveredModels(
-  models: Array<{ id: string; name?: string; [key: string]: unknown }>
-): Array<{ id: string; name: string }> {
-  return models.map((model) => ({ id: model.id, name: model.name || model.id }));
-}
