@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { CodeBuddyBaseExecutor, NEUTRAL_PROMPT } from "./codebuddy/shared.ts";
+import { CodeBuddyBaseExecutor, NEUTRAL_PROMPT, responseFromResult } from "./codebuddy/shared.ts";
 import { type ExecuteInput, type ExecutorExecuteResult, type ProviderCredentials } from "./base.ts";
 import {
   buildCorrelationHeaders,
@@ -12,6 +12,13 @@ import {
 import { buildCodeBuddyCliHeaders } from "./codebuddy-intl/cliProfile.ts";
 import { applyCliBody } from "./codebuddy-intl/body.ts";
 import { parseCodeBuddyRateLimit } from "./codebuddy-intl/lockout.ts";
+import { reportTurn, isCodeBuddyTelemetryEnabled } from "./codebuddy-intl/reportTurn.ts";
+import {
+  createTurnObservationSink,
+  tapResponseForObservation,
+  type TurnObservation,
+  type TurnOutcome,
+} from "./codebuddy-intl/turnObservation.ts";
 
 /**
  * Deterministic RFC-4122-v5-shaped UUID derived from a session key, mirroring
@@ -185,8 +192,83 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
     super(providerId);
   }
 
+  /**
+   * Run the turn and report it.
+   *
+   * The telemetry is synthetic (OmniRoute builds the events) but really sent to
+   * `/v2/report` and `/v1/traces`, and it is OPT-IN
+   * (`OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED`, off by default). It is a SIDE
+   * CHANNEL: `reportTurn()` never throws and is never awaited on the response
+   * path, so a telemetry outage cannot delay or fail the user's request.
+   *
+   * The turn is only closed when the STREAM ends: `usage` and the first-token
+   * instant exist only inside the SSE events (`stream_options.include_usage`),
+   * so the response is passed through `tapResponseForObservation` and the
+   * report is emitted from its flush/cancel. Reporting at `return` time would
+   * send an empty usage block and no first-token time — plausible, but false.
+   */
   async execute(input: ExecuteInput): Promise<ExecutorExecuteResult> {
-    return super.execute(input);
+    const startedAtMs = Date.now();
+    const model = typeof input.model === "string" ? input.model : String(input.model ?? "");
+
+    let result: ExecutorExecuteResult;
+    try {
+      result = await super.execute(input);
+    } catch (error) {
+      const op = this.peekOperation(input.body);
+      // No operation means the request never reached the wire, so there is
+      // nothing to correlate and nothing to report.
+      if (op) {
+        void reportTurn({
+          op,
+          model,
+          startedAtMs,
+          endedAtMs: Date.now(),
+          credentials: input.credentials,
+          status: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      throw error;
+    }
+
+    const op = this.peekOperation(input.body);
+    if (!op) return result;
+    if (!isCodeBuddyTelemetryEnabled()) return result;
+
+    const response = responseFromResult(result);
+    const finish = (observation: TurnObservation, outcome: TurnOutcome) => {
+      // A stream that reached its natural end reports the HTTP verdict; a turn
+      // the consumer abandoned is `cancelled` — it is NOT an upstream failure
+      // and must not be counted as one.
+      const status =
+        outcome === "cancelled" ? "cancelled" : response && response.ok ? "success" : "error";
+      void reportTurn({
+        op,
+        model,
+        startedAtMs,
+        endedAtMs: Date.now(),
+        ...(observation.firstTokenAtMs !== undefined
+          ? { firstTokenAtMs: observation.firstTokenAtMs }
+          : {}),
+        credentials: input.credentials,
+        status,
+        ...(observation.usage ? { usage: observation.usage } : {}),
+        ...(outcome === "cancelled" ? { message: "client closed the stream" } : {}),
+      });
+    };
+
+    // No body to observe (upstream never streamed, or the transport gave us a
+    // bare Response): report what we have and invent nothing.
+    if (!response || !response.body) {
+      finish({ sawEvent: false }, "completed");
+      return result;
+    }
+
+    const sink = createTurnObservationSink();
+    const tapped = tapResponseForObservation(response, sink, finish);
+    if (result instanceof Response) return tapped;
+    return { ...result, response: tapped };
   }
 
   buildHeaders(
