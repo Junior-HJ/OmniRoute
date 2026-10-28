@@ -110,6 +110,19 @@ function findResetInBody(body: unknown): number | null {
   return null;
 }
 
+/**
+ * `Retry-After` is either delta-seconds (`120`) or an HTTP date. Returns the
+ * absolute instant, or null when the value is neither. Extracted from
+ * `parseCodeBuddyRateLimit` so its nested branching does not pile onto the
+ * caller's cognitive-complexity score.
+ */
+function parseRetryAfterHeader(value: string, now: number): number | null {
+  if (/^\d+$/.test(value)) return now + Number(value) * 1000;
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function parseCodeBuddyRateLimit(input: ParseRateLimitInput): ParsedRateLimit {
   const now = input.now ?? Date.now();
   const status = input.status;
@@ -120,15 +133,10 @@ export function parseCodeBuddyRateLimit(input: ParseRateLimitInput): ParsedRateL
   // 1. `Retry-After` (delta seconds or HTTP date).
   const retryAfter = headerValue(input.headers, "retry-after");
   if (retryAfter) {
-    if (/^\d+$/.test(retryAfter)) {
-      resetAtMs = now + Number(retryAfter) * 1000;
+    const parsed = parseRetryAfterHeader(retryAfter, now);
+    if (parsed !== null) {
+      resetAtMs = parsed;
       source = "retry-after";
-    } else {
-      const parsed = Date.parse(retryAfter);
-      if (Number.isFinite(parsed)) {
-        resetAtMs = parsed;
-        source = "retry-after";
-      }
     }
   }
 

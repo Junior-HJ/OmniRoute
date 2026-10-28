@@ -66,6 +66,32 @@ function firstRecord(...values: unknown[]): JsonRecord {
   return {};
 }
 
+/**
+ * First alias that yields a defined value, mirroring a `a ?? b ?? c` chain over
+ * the same reader. The gateway field spelling is unknown (see the file header),
+ * so every capability is read through a list of plausible keys; folding the
+ * chain into a helper keeps `parseEntry` under the complexity ratchet's ceiling.
+ */
+function coalesce<T>(read: (value: unknown) => T | undefined, ...values: unknown[]): T | undefined {
+  for (const value of values) {
+    const parsed = read(value);
+    if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
+/**
+ * First alias that yields a NON-EMPTY value, mirroring the `a || b || c` chains
+ * used for identifiers and names, where an empty string must fall through.
+ */
+function coalesceNonEmpty(read: (value: unknown) => string, ...values: unknown[]): string {
+  for (const value of values) {
+    const parsed = read(value);
+    if (parsed) return parsed;
+  }
+  return "";
+}
+
 /** Locate the model array regardless of how deeply the gateway nests it. */
 function findModelArray(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
@@ -91,11 +117,7 @@ function findModelArray(payload: unknown): unknown[] {
 function parseEntry(entry: unknown): CodeBuddyCatalogModel | null {
   if (!isRecord(entry)) return null;
 
-  const id =
-    asString(entry.id) ||
-    asString(entry.model) ||
-    asString(entry.modelId) ||
-    asString(entry.model_id);
+  const id = coalesceNonEmpty(asString, entry.id, entry.model, entry.modelId, entry.model_id);
   if (!id) return null;
 
   const capabilities = firstRecord(entry.capabilities, entry.capability, entry.features);
@@ -104,66 +126,92 @@ function parseEntry(entry: unknown): CodeBuddyCatalogModel | null {
   const model: CodeBuddyCatalogModel = {
     id,
     name:
-      asString(entry.name) ||
-      asString(entry.displayName) ||
-      asString(entry.display_name) ||
-      asString(entry.label) ||
-      asString(entry.title) ||
-      id,
+      coalesceNonEmpty(
+        asString,
+        entry.name,
+        entry.displayName,
+        entry.display_name,
+        entry.label,
+        entry.title
+      ) || id,
   };
 
-  const reasoning =
-    asBoolean(entry.reasoning) ??
-    asBoolean(entry.supportsReasoning) ??
-    asBoolean(entry.supports_reasoning) ??
-    asBoolean(capabilities.reasoning) ??
-    asBoolean(capabilities.supportsReasoning) ??
-    asBoolean(capabilities.supports_reasoning);
+  applyCapabilities(model, entry, capabilities, limits);
+  return model;
+}
+
+/**
+ * Copies the optional capability numbers/flags onto `model`, leaving a field
+ * absent when no alias carried it (so callers can tell "not advertised" from
+ * "advertised as false"). Split out of `parseEntry` to keep both functions
+ * under the complexity and max-lines ratchets.
+ */
+function applyCapabilities(
+  model: CodeBuddyCatalogModel,
+  entry: JsonRecord,
+  capabilities: JsonRecord,
+  limits: JsonRecord
+): void {
+  const reasoning = coalesce(
+    asBoolean,
+    entry.reasoning,
+    entry.supportsReasoning,
+    entry.supports_reasoning,
+    capabilities.reasoning,
+    capabilities.supportsReasoning,
+    capabilities.supports_reasoning
+  );
   if (reasoning !== undefined) model.reasoning = reasoning;
 
-  const vision =
-    asBoolean(entry.vision) ??
-    asBoolean(entry.supportsVision) ??
-    asBoolean(entry.supports_vision) ??
-    asBoolean(capabilities.vision) ??
-    asBoolean(capabilities.supportsVision) ??
-    asBoolean(capabilities.supports_vision) ??
-    asBoolean(capabilities.image);
+  const vision = coalesce(
+    asBoolean,
+    entry.vision,
+    entry.supportsVision,
+    entry.supports_vision,
+    capabilities.vision,
+    capabilities.supportsVision,
+    capabilities.supports_vision,
+    capabilities.image
+  );
   if (vision !== undefined) model.vision = vision;
 
-  const toolCall =
-    asBoolean(entry.toolCall) ??
-    asBoolean(entry.tool_call) ??
-    asBoolean(entry.supportsToolCall) ??
-    asBoolean(entry.supports_tool_call) ??
-    asBoolean(entry.functionCall) ??
-    asBoolean(capabilities.toolCall) ??
-    asBoolean(capabilities.tool_call) ??
-    asBoolean(capabilities.functionCall);
+  const toolCall = coalesce(
+    asBoolean,
+    entry.toolCall,
+    entry.tool_call,
+    entry.supportsToolCall,
+    entry.supports_tool_call,
+    entry.functionCall,
+    capabilities.toolCall,
+    capabilities.tool_call,
+    capabilities.functionCall
+  );
   if (toolCall !== undefined) model.toolCall = toolCall;
 
-  const maxTokens =
-    asNumber(entry.maxTokens) ??
-    asNumber(entry.max_tokens) ??
-    asNumber(entry.maxOutputTokens) ??
-    asNumber(entry.max_output_tokens) ??
-    asNumber(capabilities.maxTokens) ??
-    asNumber(limits.maxTokens) ??
-    asNumber(limits.max_tokens);
+  const maxTokens = coalesce(
+    asNumber,
+    entry.maxTokens,
+    entry.max_tokens,
+    entry.maxOutputTokens,
+    entry.max_output_tokens,
+    capabilities.maxTokens,
+    limits.maxTokens,
+    limits.max_tokens
+  );
   if (maxTokens !== undefined) model.maxTokens = maxTokens;
 
-  const contextWindow =
-    asNumber(entry.contextWindow) ??
-    asNumber(entry.context_window) ??
-    asNumber(entry.maxInputTokens) ??
-    asNumber(entry.max_input_tokens) ??
-    asNumber(capabilities.contextWindow) ??
-    asNumber(capabilities.context_window) ??
-    asNumber(limits.contextWindow) ??
-    asNumber(limits.context_window);
+  const contextWindow = coalesce(
+    asNumber,
+    entry.contextWindow,
+    entry.context_window,
+    entry.maxInputTokens,
+    entry.max_input_tokens,
+    capabilities.contextWindow,
+    capabilities.context_window,
+    limits.contextWindow,
+    limits.context_window
+  );
   if (contextWindow !== undefined) model.contextWindow = contextWindow;
-
-  return model;
 }
 
 /** Parse a `/v3/config` payload into catalog entries. Never throws. */
