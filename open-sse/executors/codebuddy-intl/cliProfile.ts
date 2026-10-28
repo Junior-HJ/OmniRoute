@@ -1,3 +1,10 @@
+import {
+  getRuntimeArch,
+  getRuntimePlatform,
+  getRuntimeVersion,
+  normalizeStainlessArch,
+  normalizeStainlessPlatform,
+} from "../../config/providerHeaderProfiles.ts";
 import { PURPOSE_POLICY, type AgentPurpose } from "./context.ts";
 
 /**
@@ -25,8 +32,18 @@ export const CODEBUDDY_INTL_CLI_USER_AGENT = CODEBUDDY_INTL_CLI.userAgent;
 export const CODEBUDDY_INTL_SERVICE_NAME = `CodeBuddy-CLI-${CODEBUDDY_INTL_CLI.version}`;
 
 /**
- * Stainless SDK fingerprint sent by the CLI. The retry counter tracks the HTTP
- * attempt (captured `0` on the first try).
+ * Stainless SDK fingerprint sent by the CLI.
+ *
+ * `x-stainless-retry-count` is the HTTP attempt counter, derived from the
+ * operation context so a retried turn reports the attempt that is really on the
+ * wire (`0` on the first try, `1` on the first retry, …).
+ *
+ * The os/arch/runtime values are the ONLY ones the gateway does not require to
+ * be a fixed literal: the captured CLI happens to be a Windows x64 node build,
+ * but hardcoding that here would make every OmniRoute deployment claim to be
+ * that host. They are derived from the running process instead, which is both
+ * truthful and keeps the shape the gateway expects. `x-stainless-lang` and
+ * `x-stainless-package-version` stay pinned: they identify the SDK, not the host.
  */
 export function buildCodeBuddySdkHeaders(
   options: { attempt?: number } = {}
@@ -34,12 +51,21 @@ export function buildCodeBuddySdkHeaders(
   const attempt = Math.max(1, options.attempt ?? 1);
   return {
     "x-stainless-lang": "js",
-    "x-stainless-os": "Windows",
-    "x-stainless-arch": "x64",
+    "x-stainless-os": normalizeStainlessPlatform(),
+    "x-stainless-arch": normalizeStainlessArch(),
     "x-stainless-runtime": "node",
-    "x-stainless-runtime-version": "v24.14.1",
+    "x-stainless-runtime-version": getRuntimeVersion(),
     "x-stainless-package-version": "6.25.0",
     "x-stainless-retry-count": String(attempt - 1),
+  };
+}
+
+/** Raw runtime triple, exported for tests and diagnostics. */
+export function codeBuddyRuntimeFingerprint(): { platform: string; arch: string; version: string } {
+  return {
+    platform: getRuntimePlatform(),
+    arch: getRuntimeArch(),
+    version: getRuntimeVersion(),
   };
 }
 

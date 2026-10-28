@@ -717,6 +717,14 @@ export async function GET(
         const result = await discoverCodeBuddyIntlModels({
           accessToken: token,
           accountKey: connectionId,
+          // The curated registry is passed in so the merge happens before
+          // persistence: the gateway decides WHICH models exist, the curated
+          // list keeps the metadata the gateway does not publish (context
+          // windows, output caps, vision/reasoning flags) and any model it
+          // still lists that the gateway omitted. Without this the first
+          // successful fetch replaced curated rows with gateway-only rows and
+          // dropped that metadata for every model.
+          curatedModels: getModelsByProviderId(provider) || [],
           fetchImpl: (url, init) =>
             safeOutboundFetch(url, {
               ...SAFE_OUTBOUND_FETCH_PRESETS.modelsDiscovery,

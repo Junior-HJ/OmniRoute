@@ -8,10 +8,10 @@ import assert from "node:assert/strict";
 
 import {
   fetchCodeBuddyCatalog,
-  resolveCodeBuddyModels,
   clearCodeBuddyCatalogCache,
   CODEBUDDY_CONFIG_PATH,
 } from "../../open-sse/executors/codebuddy-intl/catalogFetch.ts";
+import { discoverCodeBuddyIntlModels } from "../../open-sse/services/codebuddyIntlCatalog.ts";
 
 const payload = {
   code: 0,
@@ -121,23 +121,26 @@ test("a fetch failure leaves the curated list untouched", async () => {
     throw new Error("offline");
   }) as unknown as typeof fetch;
 
-  const resolved = await resolveCodeBuddyModels(curated, {
+  const resolved = await discoverCodeBuddyIntlModels({
+    accessToken: "tok",
+    curatedModels: curated,
     fetchImpl: failing,
     accountKey: "acct-offline",
   });
 
-  assert.deepEqual(
-    resolved.models.map((model) => model.id),
-    ["glm-5.2", "kimi-k3"]
-  );
-  assert.deepEqual(resolved.added, []);
+  // `ok: false` is what tells the route to keep its own curated fallback; the
+  // list here must stay empty so nothing is persisted over the good rows.
+  assert.equal(resolved.ok, false);
+  assert.deepEqual(resolved.models, []);
 });
 
 test("a successful fetch adds gateway-only models and keeps curated ones", async () => {
   clearCodeBuddyCatalogCache();
-  const curated = [{ id: "kimi-k3.1-pro", name: "Kimi (curated)" }];
+  const curated = [{ id: "kimi-k3.1-pro", name: "Kimi (curated)", contextLength: 256000 }];
 
-  const resolved = await resolveCodeBuddyModels(curated, {
+  const resolved = await discoverCodeBuddyIntlModels({
+    accessToken: "tok",
+    curatedModels: curated,
     fetchImpl: jsonFetch([], payload),
     accountKey: "acct-merge",
   });
@@ -146,4 +149,7 @@ test("a successful fetch adds gateway-only models and keeps curated ones", async
   assert.equal(ids.includes("kimi-k3.1-pro"), true);
   assert.equal(ids.includes("brand-new-model"), true);
   assert.deepEqual(resolved.added, ["brand-new-model"]);
+  // The curated metadata survives the merge.
+  const curatedRow = resolved.models.find((model) => model.id === "kimi-k3.1-pro");
+  assert.equal(curatedRow?.contextLength, 256000);
 });

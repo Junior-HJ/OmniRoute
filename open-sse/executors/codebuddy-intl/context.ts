@@ -191,6 +191,36 @@ export function createOperationContext(
   };
 }
 
+/**
+ * Derive the context of a RETRY of an operation that already ran.
+ *
+ * A retry re-sends the SAME message: the captured CLI keeps the message id and
+ * only advances its attempt counter, and the telemetry needs the same grouping
+ * to report one message with N attempts instead of N phantom messages. What
+ * changes is the attempt (it feeds `x-stainless-retry-count`) and the span,
+ * which gets a fresh id parented by the previous attempt's span.
+ *
+ * A second DISPATCH of the same request body is NOT a retry (the caller re-sent
+ * the turn deliberately, e.g. an agent loop): it keeps the conversation but
+ * allocates a fresh message/request identity through `createOperationContext`.
+ */
+export function deriveRetryContext(
+  previous: CodeBuddyOperationContext,
+  options: { messageId?: string | null; conversationRequestId?: string | null } = {}
+): CodeBuddyOperationContext {
+  const messageId = options.messageId || hexId(16);
+  const conversationRequestId = options.conversationRequestId || hexId(16);
+  return {
+    ...previous,
+    conversationRequestId,
+    messageId,
+    requestId: messageId,
+    spanId: hexId(8),
+    parentSpanId: previous.spanId,
+    attempt: previous.attempt + 1,
+  };
+}
+
 /** Headers for one operation, minus auth/CLI profile (added by the executor). */
 export function buildCorrelationHeaders(op: CodeBuddyOperationContext): Record<string, string> {
   const policy = PURPOSE_POLICY[op.agentPurpose];

@@ -14,8 +14,13 @@ import {
   buildCodeBuddyAuthHeaders,
   buildCodeBuddySdkHeaders,
   buildCodeBuddyTelemetryHeaders,
+  codeBuddyRuntimeFingerprint,
 } from "../../open-sse/executors/codebuddy-intl/cliProfile.ts";
-import { CODEBUDDY_INTL_USER_AGENT } from "../../open-sse/config/providerHeaderProfiles.ts";
+import {
+  CODEBUDDY_INTL_USER_AGENT,
+  normalizeStainlessArch,
+  normalizeStainlessPlatform,
+} from "../../open-sse/config/providerHeaderProfiles.ts";
 
 test("the international user-agent pins the CLI profile, not the IDE", () => {
   assert.equal(CODEBUDDY_INTL_USER_AGENT, "CLI/2.175.0 CodeBuddy/2.175.0");
@@ -51,15 +56,26 @@ test("auxiliary purposes are marked as auxiliary", () => {
   }
 });
 
-test("the Stainless SDK block matches the captured client", () => {
+test("the Stainless SDK block keeps the pinned SDK identity", () => {
   const headers = buildCodeBuddySdkHeaders();
+  // SDK identity is pinned: it describes the client library, not the host.
   assert.equal(headers["x-stainless-lang"], "js");
-  assert.equal(headers["x-stainless-os"], "Windows");
-  assert.equal(headers["x-stainless-arch"], "x64");
-  assert.equal(headers["x-stainless-runtime"], "node");
-  assert.equal(headers["x-stainless-runtime-version"], "v24.14.1");
   assert.equal(headers["x-stainless-package-version"], "6.25.0");
+  assert.equal(headers["x-stainless-runtime"], "node");
   assert.equal(headers["x-stainless-retry-count"], "0");
+});
+
+test("the Stainless host fingerprint is derived, never hardcoded", () => {
+  const headers = buildCodeBuddySdkHeaders();
+  const runtime = codeBuddyRuntimeFingerprint();
+
+  // The captured CLI ran on Windows/x64/v24.14.1; a deployment must not claim
+  // to be that host, so the values track the process that is actually running.
+  assert.equal(headers["x-stainless-os"], normalizeStainlessPlatform(runtime.platform));
+  assert.equal(headers["x-stainless-arch"], normalizeStainlessArch(runtime.arch));
+  assert.equal(headers["x-stainless-runtime-version"], runtime.version);
+  assert.notEqual(headers["x-stainless-os"], "Other:unknown");
+  assert.notEqual(headers["x-stainless-arch"], "other:unknown");
 });
 
 test("the retry counter follows the attempt number", () => {

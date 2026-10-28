@@ -55,6 +55,9 @@ test("translates the native catalog into the route model shape", async () => {
     maxOutputTokens: 32000,
     supportsVision: true,
     supportsReasoning: true,
+    // The same capability under the key the discovery normalizer persists
+    // (`normalizeDiscoveredModels` reads `supportsThinking`).
+    supportsThinking: true,
   });
 });
 
@@ -130,4 +133,81 @@ test("the access token is sent as a bearer credential", async () => {
   assert.equal(seen.Authorization, "Bearer secret-token");
   // The catalog request carries the CLI identity, not a browser one.
   assert.equal(seen["X-IDE-Type"], "CLI");
+});
+
+// ── I4: the merge is wired, so curated metadata is not lost ────────────────
+//
+// Before the merge was wired, the first successful `/v3/config` fetch replaced
+// the curated rows with gateway-only rows: every context window and capability
+// the registry declares was dropped from the synced catalog.
+
+const CURATED = [
+  {
+    id: "glm-5.2",
+    name: "GLM-5.2",
+    contextLength: 1_000_000,
+    maxOutputTokens: 48_000,
+    supportsReasoning: true,
+  },
+  { id: "curated-only-model", name: "Curated Only", contextLength: 128_000 },
+];
+
+test("curated metadata survives a gateway row that omits it", async () => {
+  const result = await discoverCodeBuddyIntlModels({
+    accessToken: "token",
+    curatedModels: CURATED,
+    fetchImpl: (async () =>
+      jsonResponse({
+        data: { models: [{ id: "glm-5.2", name: "GLM-5.2" }] },
+      })) as unknown as typeof fetch,
+  });
+
+  const row = result.models.find((model) => model.id === "glm-5.2");
+  assert.equal(row?.contextLength, 1_000_000, "curated window must not be replaced by nothing");
+  assert.equal(row?.maxOutputTokens, 48_000);
+  assert.equal(row?.supportsReasoning, true);
+  assert.equal(row?.supportsThinking, true);
+});
+
+test("the gateway's live numbers win over the curated ones", async () => {
+  const result = await discoverCodeBuddyIntlModels({
+    accessToken: "token",
+    curatedModels: CURATED,
+    fetchImpl: (async () =>
+      jsonResponse({
+        data: { models: [{ id: "glm-5.2", name: "GLM-5.2", max_input_tokens: 200000 }] },
+      })) as unknown as typeof fetch,
+  });
+
+  const row = result.models.find((model) => model.id === "glm-5.2");
+  assert.equal(row?.contextLength, 200_000);
+});
+
+test("curated-only models are kept and reported as stale", async () => {
+  const result = await discoverCodeBuddyIntlModels({
+    accessToken: "token",
+    curatedModels: CURATED,
+    fetchImpl: (async () =>
+      jsonResponse({
+        data: { models: [{ id: "glm-5.2" }, { id: "gateway-only" }] },
+      })) as unknown as typeof fetch,
+  });
+
+  const ids = result.models.map((model) => model.id);
+  assert.deepEqual(ids, ["glm-5.2", "curated-only-model", "gateway-only"]);
+  assert.deepEqual(result.stale, ["curated-only-model"]);
+  assert.deepEqual(result.added, ["gateway-only"]);
+});
+
+test("without a curated list the gateway catalog is served as-is", async () => {
+  const result = await discoverCodeBuddyIntlModels({
+    accessToken: "token",
+    fetchImpl: (async () =>
+      jsonResponse({
+        data: { models: [{ id: "only", name: "Only" }] },
+      })) as unknown as typeof fetch,
+  });
+
+  assert.deepEqual(result.models, [{ id: "only", name: "Only" }]);
+  assert.equal(result.added, undefined);
 });

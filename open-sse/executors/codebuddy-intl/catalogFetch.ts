@@ -1,4 +1,4 @@
-import { parseCodeBuddyConfig, mergeCatalogWithCurated } from "./catalog.ts";
+import { parseCodeBuddyConfig } from "./catalog.ts";
 import { CODEBUDDY_INTL_CLI_USER_AGENT } from "./cliProfile.ts";
 
 /**
@@ -107,25 +107,4 @@ export async function fetchCodeBuddyCatalog(
   } finally {
     clearTimeout(timer);
   }
-}
-
-/**
- * Merge the live catalog into the curated registry list. When the fetch fails
- * the curated list is returned untouched (identical ids, no ordering churn).
- */
-export async function resolveCodeBuddyModels<T extends { id: string }>(
-  curated: T[],
-  options: FetchCatalogOptions = {}
-): Promise<{ models: Array<T & Record<string, unknown>>; added: string[]; stale: string[] }> {
-  const result = await fetchCodeBuddyCatalog(options);
-  if (!result.ok || result.models.length === 0) {
-    return { models: curated as Array<T & Record<string, unknown>>, added: [], stale: [] };
-  }
-
-  const merged = mergeCatalogWithCurated(result.models, curated);
-  return {
-    models: merged.models as Array<T & Record<string, unknown>>,
-    added: merged.added,
-    stale: merged.stale,
-  };
 }
