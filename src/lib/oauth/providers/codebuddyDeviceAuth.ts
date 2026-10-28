@@ -5,6 +5,12 @@ export interface CodeBuddyDeviceCodeConfig {
   platform: string;
   domain?: string;
   pollInterval?: number;
+  /**
+   * Send the captured CLI state body (literal `{}`) instead of
+   * `{"platform": ...}`. Only the intl CLI login was captured with it, so
+   * providers sharing this module (codebuddy-cn) keep the platform body.
+   */
+  emptyStateBody?: boolean;
 }
 
 export interface CodeBuddyDeviceCodeResponse {
@@ -54,9 +60,16 @@ export interface CodeBuddyPollResult {
  */
 export const CODEBUDDY_LOGIN_PENDING_CODE = 11217;
 
-/** Body of `POST /v2/plugin/auth/state?platform=CLI` — captured as literal `{}`. */
-export function buildCodeBuddyStateRequestBody(): string {
-  return "{}";
+/**
+ * Body of `POST /v2/plugin/auth/state`. The intl CLI capture sends a literal
+ * `{}` (the default when no config is given); a config that does not opt into
+ * `emptyStateBody` keeps the `{"platform": ...}` body it always sent.
+ */
+export function buildCodeBuddyStateRequestBody(
+  config?: Pick<CodeBuddyDeviceCodeConfig, "platform" | "emptyStateBody">
+): string {
+  if (!config || config.emptyStateBody) return "{}";
+  return JSON.stringify({ platform: config.platform });
 }
 
 /**
@@ -118,7 +131,7 @@ export async function requestDeviceCode(
       "X-No-User-Id": "true",
       "X-Product": "SaaS",
     },
-    body: buildCodeBuddyStateRequestBody(),
+    body: buildCodeBuddyStateRequestBody(config),
   });
 
   if (!response.ok) {
