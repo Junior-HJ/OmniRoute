@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { CodeBuddyBaseExecutor, NEUTRAL_PROMPT, responseFromResult } from "./codebuddy/shared.ts";
+import { CodeBuddyBaseExecutor, NEUTRAL_PROMPT } from "./codebuddy/shared.ts";
 import { type ExecuteInput, type ExecutorExecuteResult, type ProviderCredentials } from "./base.ts";
 import {
   buildCorrelationHeaders,
@@ -12,7 +12,6 @@ import {
 import { buildCodeBuddyCliHeaders } from "./codebuddy-intl/cliProfile.ts";
 import { applyCliBody } from "./codebuddy-intl/body.ts";
 import { parseCodeBuddyRateLimit } from "./codebuddy-intl/lockout.ts";
-import { reportTurn } from "./codebuddy-intl/reportTurn.ts";
 
 /**
  * Deterministic RFC-4122-v5-shaped UUID derived from a session key, mirroring
@@ -186,53 +185,8 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
     super(providerId);
   }
 
-  /**
-   * Run the turn and report it.
-   *
-   * The telemetry is synthetic (OmniRoute builds the events) but really sent to
-   * `/v2/report` and `/v1/traces`. It is a SIDE CHANNEL: `reportTurn()` never
-   * throws and is not awaited on the response path, so a telemetry outage cannot
-   * delay or fail the user's request.
-   */
   async execute(input: ExecuteInput): Promise<ExecutorExecuteResult> {
-    const startedAtMs = Date.now();
-    const model = typeof input.model === "string" ? input.model : String(input.model ?? "");
-
-    let result: ExecutorExecuteResult;
-    try {
-      result = await super.execute(input);
-    } catch (error) {
-      // The operation stored for this body is the attempt that threw, so its
-      // span/trace describe the attempt that actually failed.
-      const op = this.peekOperation(input.body);
-      if (op) {
-        void reportTurn({
-          op,
-          model,
-          startedAtMs,
-          endedAtMs: Date.now(),
-          credentials: input.credentials,
-          status: "error",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-      throw error;
-    }
-
-    const op = this.peekOperation(input.body);
-    if (op) {
-      const response = responseFromResult(result);
-      void reportTurn({
-        op,
-        model,
-        startedAtMs,
-        endedAtMs: Date.now(),
-        credentials: input.credentials,
-        status: response?.ok ? "success" : "error",
-      });
-    }
-
-    return result;
+    return super.execute(input);
   }
 
   buildHeaders(
@@ -293,7 +247,7 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
    * attempt failed and is being re-sent. Deriving instead of overwriting keeps
    * the conversation identity while advancing the attempt counter, allocating a
    * fresh span and minting a fresh message for this dispatch — which is what the
-   * gateway's `x-stainless-retry-count` and the telemetry both describe.
+   * gateway's `x-stainless-retry-count` describes.
    */
   private rememberAttempt(body: unknown, op: CodeBuddyOperationContext): void {
     if (!body || typeof body !== "object") return;
