@@ -73,36 +73,36 @@ test("#5183 partition order is preserved within each bucket", () => {
 
 test("computeNextBlockedProviders: single provider block and unblock", () => {
   // Block single provider
-  const blocked = computeNextBlockedProviders([], "opencode", false);
-  assert.deepEqual(blocked, ["opencode"]);
+  const blocked = computeNextBlockedProviders([], "auggie", false);
+  assert.deepEqual(blocked, ["auggie"]);
 
   // Unblock single provider with alias in list
-  const unblocked = computeNextBlockedProviders(["opencode", "oc", "unrelated"], "opencode", true);
+  const unblocked = computeNextBlockedProviders(["auggie", "aug", "unrelated"], "auggie", true);
   assert.deepEqual(unblocked, ["unrelated"]);
 });
 
 test("computeNextBlockedProviders: alias resolution on block and unblock", () => {
   // Unblock using alias key removes both alias and canonical id
-  const unblocked = computeNextBlockedProviders(["opencode", "oc", "unrelated"], "oc", true);
+  const unblocked = computeNextBlockedProviders(["auggie", "aug", "unrelated"], "aug", true);
   assert.deepEqual(unblocked, ["unrelated"]);
 
   // Block using alias key stores canonical id
-  const blocked = computeNextBlockedProviders(["unrelated"], "oc", false);
-  assert.deepEqual(blocked, ["unrelated", "opencode"]);
+  const blocked = computeNextBlockedProviders(["unrelated"], "aug", false);
+  assert.deepEqual(blocked, ["unrelated", "auggie"]);
 });
 
 test("computeNextBlockedProviders: bulk block and unblock", () => {
-  const targets = ["opencode", "duckduckgo-web"];
+  const targets = ["auggie", "duckduckgo-web"];
 
   // Bulk block
   const blocked = computeNextBlockedProviders(["custom-blocked"], targets, false);
   assert.ok(blocked.includes("custom-blocked"));
-  assert.ok(blocked.includes("opencode"));
+  assert.ok(blocked.includes("auggie"));
   assert.ok(blocked.includes("duckduckgo-web"));
 
   // Bulk unblock removes all targets and their aliases
   const unblocked = computeNextBlockedProviders(
-    ["custom-blocked", "opencode", "oc", "duckduckgo-web", "ddgw"],
+    ["custom-blocked", "auggie", "aug", "duckduckgo-web", "ddgw"],
     targets,
     true
   );

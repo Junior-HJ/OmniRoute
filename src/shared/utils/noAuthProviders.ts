@@ -96,31 +96,25 @@ export function computeNextBlockedProviders(
   enable: boolean
 ): string[] {
   const current = normalizeBlockedProviderSet(currentBlocked);
-  const targets = Array.isArray(targetIds) ? targetIds : [targetIds];
-  const keysToClean = new Set<string>();
+  const targets = (Array.isArray(targetIds) ? targetIds : [targetIds]).filter(
+    (rawId): rawId is string => typeof rawId === "string" && rawId.length > 0
+  );
 
   for (const rawId of targets) {
-    if (!rawId || typeof rawId !== "string") continue;
-    const canonicalId = resolveProviderId(rawId);
-    keysToClean.add(rawId);
-    keysToClean.add(canonicalId);
-    const alias = getProviderAlias(canonicalId);
-    if (alias) keysToClean.add(alias);
-    const baseId = canonicalId.replace(/-search$/, "");
-    if (baseId) keysToClean.add(baseId);
-  }
-
-  for (const key of keysToClean) {
-    current.delete(key);
+    for (const key of blockedKeysFor(rawId)) current.delete(key);
   }
 
   if (!enable) {
-    for (const rawId of targets) {
-      if (rawId && typeof rawId === "string") {
-        current.add(resolveProviderId(rawId));
-      }
-    }
+    for (const rawId of targets) current.add(resolveProviderId(rawId));
   }
 
   return Array.from(current);
+}
+
+/** Every `blockedProviders` key that can refer to `rawId`: itself, canonical id, alias, base id. */
+function blockedKeysFor(rawId: string): string[] {
+  const canonicalId = resolveProviderId(rawId);
+  const alias = getProviderAlias(canonicalId);
+  const baseId = canonicalId.replace(/-search$/, "");
+  return [rawId, canonicalId, alias, baseId].filter((key): key is string => Boolean(key));
 }
