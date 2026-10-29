@@ -895,9 +895,10 @@ when any other field is set. For lite, `additionalQueries`, `systemPrompt` and e
 `subpages`, `subpageTarget`, `highlights.numSentences` and `highlights.highlightsPerUrl` are no
 longer forwarded.
 
-Cost accounting is the flat registry `costPerQuery`, except Exa `type: "lite"`, which is
-recorded at the lite price ($0.004 per call vs $0.007 for `auto`). The legacy `instant` type
-is billed like lite; `fast` is billed like `auto`. Tavily bills
+Cost accounting is the flat registry `costPerQuery`, except for Exa, which follows Exa's
+own pricing: $0.007 per call for `auto` (and the legacy `fast`) or $0.004 for `lite` (and the
+legacy `instant`), covering 10 results; $0.001 for each further result; and $0.001 per
+returned result when `contents.summary` is set. Tavily bills
 `search_depth: "advanced"` at more credits per call, and that difference is not reflected in
 `usage.search_cost_usd`.
 
