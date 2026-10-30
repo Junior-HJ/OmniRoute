@@ -197,7 +197,7 @@ export class CodeBuddyIntlExecutor extends CodeBuddyBaseExecutor {
    *
    * The telemetry is synthetic (OmniRoute builds the events) but really sent to
    * `/v2/report` and `/v1/traces`, and it is OPT-IN
-   * (`OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED`, off by default). It is a SIDE
+   * (`CODEBUDDY_TELEMETRY_ENABLED`, off by default). It is a SIDE
    * CHANNEL: `reportTurn()` never throws and is never awaited on the response
    * path, so a telemetry outage cannot delay or fail the user's request.
    *

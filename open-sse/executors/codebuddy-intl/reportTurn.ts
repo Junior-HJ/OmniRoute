@@ -16,7 +16,7 @@ import {
  *  - Side channel: never throws, never blocks the caller (fire-and-forget) and
  *    never logs payloads.
  *  - Opt-in: DISABLED unless the operator turns
- *    `OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED` on. OmniRoute does not report on
+ *    `CODEBUDDY_TELEMETRY_ENABLED` on. OmniRoute does not report on
  *    anyone's behalf by default; the flag is a
  *    feature flag (DB override > env > definition default), not an env-only
  *    switch, so it can be flipped from the dashboard per install.
@@ -25,7 +25,7 @@ import {
 import { isFeatureFlagEnabled } from "@/shared/utils/featureFlags";
 
 /** Feature flag gating the outbound reports. Default: disabled. */
-export const CODEBUDDY_TELEMETRY_FLAG = "OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED";
+export const CODEBUDDY_TELEMETRY_FLAG = "CODEBUDDY_TELEMETRY_ENABLED";
 const TELEMETRY_TIMEOUT_MS = 5_000;
 
 export interface ReportTurnInput {

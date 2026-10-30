@@ -79,7 +79,7 @@ describe("feature-flags-settings count update", () => {
     // OPENCODE_PUBLISHED_CATALOG_ROUTING_ENABLED (#16798, default off) to 87.
     // CURSOR_GROK_47_DROP_MAX_EFFORT (#17386, default off) to 112.
     // UNPRICED_USAGE_BUDGET_POLICY (#14604, default fail_closed) to 113.
-    // OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED (#18398, default off) to 114.
+    // CODEBUDDY_TELEMETRY_ENABLED (#18398, default off) to 114.
     assert.equal(FEATURE_FLAG_DEFINITIONS.length, 114);
     // OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED (#16571, default off) to 87.
     // COMBO_EMPTY_POOL_NO_ELIGIBLE_TARGETS_ENABLED (#16256, default off) to 87.
@@ -95,7 +95,7 @@ describe("feature-flags-settings count update", () => {
     // STREAM_LATE_OUTPUT_PROBE_ENABLED (#16927 late-output stream probe, default off) to 88.
     // LMARENA_SYNTHESIZED_CX_ENABLED (#16895, default off) to 88.
     // NATIVE_CODEX_REACTIVE_COMPACTION_ENABLED (#16632, default off) to 88.
-    // OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED (#18398, opt-in turn reports for the
+    // CODEBUDDY_TELEMETRY_ENABLED (#18398, opt-in turn reports for the
     // `codebuddy-intl` executor, default off) to 89.
     // UNPRICED_USAGE_BUDGET_POLICY (#14604, explicit enum policy, default fail_closed) to 114.
     assert.equal(FEATURE_FLAG_DEFINITIONS.length, 114);

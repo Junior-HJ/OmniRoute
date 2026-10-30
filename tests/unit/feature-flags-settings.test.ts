@@ -59,7 +59,7 @@ const {
 // OPENCODE_PUBLISHED_CATALOG_ROUTING_ENABLED (#16798, OpenCode model surface from the
 // published catalog, default off) takes it to 87.
 // UNPRICED_USAGE_BUDGET_POLICY (#14604, explicit enum policy, default fail_closed) to 113.
-// OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED (#18398, opt-in turn reports for the
+// CODEBUDDY_TELEMETRY_ENABLED (#18398, opt-in turn reports for the
 // `codebuddy-intl` executor, default off) to 114.
 const EXPECTED_FEATURE_FLAG_COUNT = 114;
 // tool_call wrapper repair, default on) to 86; OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED
