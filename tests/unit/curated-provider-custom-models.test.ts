@@ -28,9 +28,12 @@ const providersDb = await import("../../src/lib/db/providers.ts");
 const modelsDb = await import("../../src/lib/db/models.ts");
 const v1ModelsCatalog = await import("../../src/app/api/v1/models/catalog.ts");
 
-// `codebuddy-intl` is the provider from the report: alias `cbai`, curated-only.
-const CURATED_PROVIDER = "codebuddy-intl";
-const CURATED_ALIAS = "cbai";
+// `zai-web` is a curated-only provider: its registry rows are the complete lineup
+// and it has no upstream model-catalog endpoint, so it exercises exactly the
+// curated-provider + custom-model path. (`codebuddy-intl` is NOT curated-only — it
+// merges an authenticated `GET /v3/config` catalog at runtime.)
+const CURATED_PROVIDER = "zai-web";
+const CURATED_ALIAS = "zw";
 const CUSTOM_MODEL_ID = "deepseek-v4.1-flash-1017";
 
 async function resetStorage() {
@@ -101,4 +104,22 @@ test("the curated catalog still ships when no custom model was added", async () 
     false,
     "nothing was added, so nothing custom may appear"
   );
+});
+
+test("/v1/models keeps a discovery-imported custom row off a curated-only provider", async () => {
+  // Operator rows reach /v1/models (#18018); a row a discovery sync imported is a stale
+  // leftover on a provider with no upstream catalog and must stay unroutable (#8451).
+  await modelsDb.addCustomModel(CURATED_PROVIDER, "stale-imported-model", "Stale", "imported");
+  await modelsDb.addCustomModel(CURATED_PROVIDER, CUSTOM_MODEL_ID, "DeepSeek V4.1 Flash");
+
+  const response = await v1ModelsCatalog.getUnifiedModelsResponse(
+    new Request("http://localhost/api/v1/models")
+  );
+  assert.equal(response.status, 200);
+
+  const body = (await response.json()) as { data: Array<{ id: string }> };
+  const ids = body.data.map((row) => row.id);
+
+  assert.ok(ids.includes(`${CURATED_ALIAS}/${CUSTOM_MODEL_ID}`), "operator row must be listed");
+  assert.equal(ids.includes(`${CURATED_ALIAS}/stale-imported-model`), false);
 });

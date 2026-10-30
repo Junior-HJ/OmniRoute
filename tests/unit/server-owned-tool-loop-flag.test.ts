@@ -77,7 +77,10 @@ describe("feature-flags-settings count update", () => {
     // REASONING_REPLAY_ENABLED (#12486, default on) to 84; COMBO_AUTO_PRUNE_STALE_STEPS
     // (#13505, default off) to 85; KIRO_TOOL_CALL_REPAIR_ENABLED (default on) to 86;
     // OPENCODE_PUBLISHED_CATALOG_ROUTING_ENABLED (#16798, default off) to 87.
-    assert.equal(FEATURE_FLAG_DEFINITIONS.length, 112);
+    // CURSOR_GROK_47_DROP_MAX_EFFORT (#17386, default off) to 112.
+    // UNPRICED_USAGE_BUDGET_POLICY (#14604, default fail_closed) to 113.
+    // OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED (#18398, default off) to 114.
+    assert.equal(FEATURE_FLAG_DEFINITIONS.length, 114);
     // OPENCODE_V2_CLIENT_FINGERPRINT_ENABLED (#16571, default off) to 87.
     // COMBO_EMPTY_POOL_NO_ELIGIBLE_TARGETS_ENABLED (#16256, default off) to 87.
     // OPENCODE_ZEN_EGRESS_IP_LOCK_ENABLED (#16797, default off) to 87;
@@ -94,7 +97,8 @@ describe("feature-flags-settings count update", () => {
     // NATIVE_CODEX_REACTIVE_COMPACTION_ENABLED (#16632, default off) to 88.
     // OMNIROUTE_CODEBUDDY_TELEMETRY_ENABLED (#18398, opt-in turn reports for the
     // `codebuddy-intl` executor, default off) to 89.
-    assert.equal(FEATURE_FLAG_DEFINITIONS.length, 112);
+    // UNPRICED_USAGE_BUDGET_POLICY (#14604, explicit enum policy, default fail_closed) to 114.
+    assert.equal(FEATURE_FLAG_DEFINITIONS.length, 114);
   });
 });
 
