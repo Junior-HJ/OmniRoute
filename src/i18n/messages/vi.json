@@ -11617,8 +11617,8 @@
     "tabPasteSetupToken": "Token thiết lập",
     "claudeSetupTokenDescription": "Chạy `claude setup-token` trong terminal và dán token mà lệnh in ra. Token có hiệu lực một năm và không có token làm mới. OmniRoute gửi một yêu cầu thử nghiệm đến Anthropic trước khi lưu.",
     "claudeSetupTokenPlaceholder": "sk-ant-oat01-...",
-    "tabPasteRefreshToken": "Token làm mới",
-    "antigravityRefreshTokenDescription": "Dán token làm mới OAuth của Google cho Antigravity. OmniRoute xác thực và trao đổi token trước khi lưu.",
+    "tabPasteRefreshToken": "Làm mới mã thông báo",
+    "antigravityRefreshTokenDescription": "Dán mã thông báo làm mới Google OAuth của bạn cho Antigravity. OmniRoute xác nhận và trao đổi nó trước khi lưu.",
     "antigravityRefreshTokenPlaceholder": "1//..."
   },
   "cursorAuthModal": {
